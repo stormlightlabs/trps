@@ -34,6 +34,17 @@ pub enum Severity {
     High,
 }
 
+impl Severity {
+    /// Returns the report symbol for this severity.
+    pub fn symbol(self) -> &'static str {
+        match self {
+            Self::Low => "ℹ",
+            Self::Medium => "⚠",
+            Self::High => "✕",
+        }
+    }
+}
+
 /// A deserialized TOML pattern file.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 pub struct PatternFile {

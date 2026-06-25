@@ -69,18 +69,27 @@ fn read_input(input: Option<PathBuf>) -> Result<String, String> {
 
 fn print_finding(finding: &Finding) {
     println!(
-        "{} {} {} {}:{} {}",
+        "{} {} {}",
+        finding.severity.symbol(),
         severity_label(finding.severity),
-        finding.kind.label(),
         finding
             .rule_id
             .if_supports_color(Stream::Stdout, |text| text.bold()),
+    );
+    println!(
+        "  ├─ {} {}:{}",
+        finding.kind.label(),
         finding.span.start(),
         finding.span.end(),
-        finding
-            .matched
-            .if_supports_color(Stream::Stdout, |text| text.yellow())
     );
+    println!(
+        "  └─ {}",
+        indented_match(&finding.matched).if_supports_color(Stream::Stdout, |text| text.yellow())
+    );
+}
+
+fn indented_match(value: &str) -> String {
+    value.lines().collect::<Vec<_>>().join("\n     ")
 }
 
 fn severity_label(severity: Severity) -> String {
