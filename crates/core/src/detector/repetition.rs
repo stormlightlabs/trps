@@ -56,8 +56,7 @@ fn scan_dead_metaphor(text: &str) -> Vec<Finding> {
         .filter(|spans| spans.len() >= 5)
         .map(|spans| {
             Finding::repetition(
-                "composition.dead_metaphor",
-                "The Dead Metaphor",
+                ("composition.dead_metaphor", "The Dead Metaphor"),
                 Severity::Medium,
                 text,
                 super::Span(spans[0].start(), spans[spans.len() - 1].end()),
@@ -86,8 +85,7 @@ fn scan_one_point_dilution(text: &str, paragraphs: &[super::Span]) -> Vec<Findin
         })
         .map(|window| {
             Finding::repetition(
-                "composition.one_point_dilution",
-                "One-Point Dilution",
+                ("composition.one_point_dilution", "One-Point Dilution"),
                 Severity::Medium,
                 text,
                 super::Span(window[0].0.start(), window[2].0.end()),
@@ -142,8 +140,7 @@ fn duplicate_normalized_spans(
 
         if let Some(previous) = seen.get(&normalized) {
             findings.push(Finding::repetition(
-                rule_id,
-                rule_name,
+                (rule_id, rule_name),
                 Severity::High,
                 text,
                 super::Span(previous.start(), span.end()),

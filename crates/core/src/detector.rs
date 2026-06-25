@@ -1,6 +1,7 @@
 //! Text detectors for phrase-based and structural trope signals.
 
 pub mod char_class;
+pub mod markdown;
 pub mod repetition;
 pub mod structural;
 
@@ -56,6 +57,7 @@ impl Detector {
     pub fn scan(&self, text: &str) -> Vec<Finding> {
         let mut findings = self.scan_phrases(text);
         findings.extend(char_class::scan_unicode_decoration(text));
+        findings.extend(markdown::scan_markdown(text));
         findings.extend(structural::scan_structural(text));
         findings.extend(repetition::scan_repetition(text));
         findings.sort_by_key(|finding| finding.span.start());
@@ -100,17 +102,11 @@ pub struct Finding {
 }
 
 impl Finding {
-    pub fn structural(
-        rule_id: &str,
-        rule_name: &str,
-        severity: Severity,
-        text: &str,
-        span: Span,
-    ) -> Finding {
+    pub fn structural(rule: (&str, &str), text: &str, span: Span) -> Finding {
         Finding {
-            rule_id: rule_id.to_owned(),
-            rule_name: rule_name.to_owned(),
-            severity,
+            rule_id: rule.0.to_owned(),
+            rule_name: rule.1.to_owned(),
+            severity: Severity::Medium,
             kind: FindingKind::Structural,
             matched: text[span.start()..span.end()].to_owned(),
             span,
@@ -118,18 +114,24 @@ impl Finding {
     }
 
     /// Builds a repetition finding from a byte range in the scanned text.
-    pub fn repetition(
-        rule_id: &str,
-        rule_name: &str,
-        severity: Severity,
-        text: &str,
-        span: Span,
-    ) -> Finding {
+    pub fn repetition(rule: (&str, &str), severity: Severity, text: &str, span: Span) -> Finding {
         Finding {
-            rule_id: rule_id.to_owned(),
-            rule_name: rule_name.to_owned(),
+            rule_id: rule.0.to_owned(),
+            rule_name: rule.1.to_owned(),
             severity,
             kind: FindingKind::Repetition,
+            matched: text[span.start()..span.end()].to_owned(),
+            span,
+        }
+    }
+
+    /// Builds a markdown-aware finding from a byte range in the scanned text.
+    pub fn markdown(rule: (&str, &str), severity: Severity, text: &str, span: Span) -> Finding {
+        Finding {
+            rule_id: rule.0.to_owned(),
+            rule_name: rule.1.to_owned(),
+            severity,
+            kind: FindingKind::Markdown,
             matched: text[span.start()..span.end()].to_owned(),
             span,
         }
@@ -147,6 +149,8 @@ pub enum FindingKind {
     Structural,
     /// Repeated document content matched by repetition detectors.
     Repetition,
+    /// Markdown syntax matched by markdown-aware detectors.
+    Markdown,
 }
 
 impl Display for FindingKind {
@@ -156,6 +160,7 @@ impl Display for FindingKind {
             FindingKind::CharacterClass => "char",
             FindingKind::Structural => "struct",
             FindingKind::Repetition => "repeat",
+            FindingKind::Markdown => "markdown",
         })
     }
 }
