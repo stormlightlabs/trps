@@ -4,7 +4,6 @@ name = "Em-Dash Addiction"
 severity = "medium"
 phrases = [
   " -- ",
-  " — "
 ]
 
 [[patterns]]

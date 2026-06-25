@@ -1,6 +1,6 @@
 //! Pattern dictionary types and bundled TOML loading.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, error::Error, fmt};
 
 /// TOML files bundled into `tropius-core`.
 pub const BUNDLED_PATTERN_FILES: &[(&str, &str)] = &[
@@ -39,6 +39,22 @@ pub fn validate_patterns(patterns: &[Pattern]) -> Result<(), PatternValidationEr
     let mut phrases = HashSet::new();
 
     for pattern in patterns {
+        if pattern.id.trim().is_empty() {
+            return Err(PatternValidationError::EmptyPatternId);
+        }
+
+        if pattern.name.trim().is_empty() {
+            return Err(PatternValidationError::EmptyPatternName {
+                id: pattern.id.clone(),
+            });
+        }
+
+        if pattern.phrases.is_empty() {
+            return Err(PatternValidationError::EmptyPhraseList {
+                id: pattern.id.clone(),
+            });
+        }
+
         if !ids.insert(pattern.id.as_str()) {
             return Err(PatternValidationError::DuplicatePatternId {
                 id: pattern.id.clone(),
@@ -46,6 +62,12 @@ pub fn validate_patterns(patterns: &[Pattern]) -> Result<(), PatternValidationEr
         }
 
         for phrase in &pattern.phrases {
+            if phrase.trim().is_empty() {
+                return Err(PatternValidationError::EmptyPhrase {
+                    id: pattern.id.clone(),
+                });
+            }
+
             let normalized = phrase.to_ascii_lowercase();
 
             if !phrases.insert(normalized) {
@@ -68,6 +90,24 @@ pub enum PatternLoadError {
     Validation(PatternValidationError),
 }
 
+impl fmt::Display for PatternLoadError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Toml(error) => write!(formatter, "failed to parse pattern TOML: {error}"),
+            Self::Validation(error) => write!(formatter, "invalid pattern dictionary: {error}"),
+        }
+    }
+}
+
+impl Error for PatternLoadError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Toml(error) => Some(error),
+            Self::Validation(error) => Some(error),
+        }
+    }
+}
+
 impl From<toml::de::Error> for PatternLoadError {
     fn from(error: toml::de::Error) -> Self {
         Self::Toml(error)
@@ -83,6 +123,23 @@ impl From<PatternValidationError> for PatternLoadError {
 /// Validation errors for parsed pattern dictionaries.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PatternValidationError {
+    /// A pattern id is empty or only whitespace.
+    EmptyPatternId,
+    /// A pattern name is empty or only whitespace.
+    EmptyPatternName {
+        /// The id of the invalid pattern.
+        id: String,
+    },
+    /// A pattern has no phrases.
+    EmptyPhraseList {
+        /// The id of the invalid pattern.
+        id: String,
+    },
+    /// A pattern phrase is empty or only whitespace.
+    EmptyPhrase {
+        /// The id of the invalid pattern.
+        id: String,
+    },
     /// Two patterns use the same id.
     DuplicatePatternId {
         /// The duplicate pattern id.
@@ -94,6 +151,27 @@ pub enum PatternValidationError {
         phrase: String,
     },
 }
+
+impl fmt::Display for PatternValidationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyPatternId => write!(formatter, "pattern id cannot be empty"),
+            Self::EmptyPatternName { id } => {
+                write!(formatter, "pattern `{id}` name cannot be empty")
+            }
+            Self::EmptyPhraseList { id } => {
+                write!(formatter, "pattern `{id}` must have at least one phrase")
+            }
+            Self::EmptyPhrase { id } => {
+                write!(formatter, "pattern `{id}` contains an empty phrase")
+            }
+            Self::DuplicatePatternId { id } => write!(formatter, "duplicate pattern id `{id}`"),
+            Self::DuplicatePhrase { phrase } => write!(formatter, "duplicate phrase `{phrase}`"),
+        }
+    }
+}
+
+impl Error for PatternValidationError {}
 
 /// Severity attached to a pattern or detector finding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
@@ -238,6 +316,72 @@ phrases = ["delve into"]
             validate_patterns(&patterns),
             Err(PatternValidationError::DuplicatePhrase {
                 phrase: "delve into".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_empty_pattern_ids() {
+        let patterns = vec![Pattern {
+            id: " ".to_owned(),
+            name: "Empty".to_owned(),
+            severity: Severity::Medium,
+            phrases: vec!["delve into".to_owned()],
+        }];
+
+        assert_eq!(
+            validate_patterns(&patterns),
+            Err(PatternValidationError::EmptyPatternId)
+        );
+    }
+
+    #[test]
+    fn rejects_empty_pattern_names() {
+        let patterns = vec![Pattern {
+            id: "word_choice.delve".to_owned(),
+            name: " ".to_owned(),
+            severity: Severity::Medium,
+            phrases: vec!["delve into".to_owned()],
+        }];
+
+        assert_eq!(
+            validate_patterns(&patterns),
+            Err(PatternValidationError::EmptyPatternName {
+                id: "word_choice.delve".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_empty_phrase_lists() {
+        let patterns = vec![Pattern {
+            id: "word_choice.delve".to_owned(),
+            name: "Delve".to_owned(),
+            severity: Severity::Medium,
+            phrases: Vec::new(),
+        }];
+
+        assert_eq!(
+            validate_patterns(&patterns),
+            Err(PatternValidationError::EmptyPhraseList {
+                id: "word_choice.delve".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_empty_phrases() {
+        let patterns = vec![Pattern {
+            id: "word_choice.delve".to_owned(),
+            name: "Delve".to_owned(),
+            severity: Severity::Medium,
+            phrases: vec![" ".to_owned()],
+        }];
+
+        assert_eq!(
+            validate_patterns(&patterns),
+            Err(PatternValidationError::EmptyPhrase {
+                id: "word_choice.delve".to_owned(),
             })
         );
     }

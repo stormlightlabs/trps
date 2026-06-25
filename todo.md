@@ -41,6 +41,7 @@ phrases = [
 ## Trope Coverage Checklist
 
 Current phrase coverage: 22 of 33 source sections.
+Implemented non-Aho detectors: 1.
 
 - [x] Quietly and Other Magic Adverbs
 - [x] Delve and Friends
@@ -67,7 +68,7 @@ Current phrase coverage: 22 of 33 source sections.
 - [x] Invented Concept Labels
 - [x] Em-Dash Addiction
 - [ ] Bold-First Bullets - markdown-aware detector
-- [ ] Unicode Decoration - character-class detector
+- [x] Unicode Decoration - character-class detector
 - [ ] Fractal Summaries - structural detector
 - [ ] The Dead Metaphor - repetition detector
 - [ ] Historical Analogy Stacking - structural detector
@@ -94,6 +95,9 @@ second`, `The third` across adjacent paragraphs.
 - Bold-First Bullets: parse markdown list items and flag bullets that start with
   bold text.
 - Unicode Decoration: scan for configured Unicode punctuation and symbols.
+  Actual Unicode em dashes belong here, not in phrase TOML. Keep ASCII `" -- "`
+  as a phrase proxy for typed em-dash style until Em-Dash Addiction gets a count
+  or density detector.
 - Fractal Summaries: detect repeated summary/conclusion signposts at section
   boundaries.
 - The Dead Metaphor: count repeated uncommon nouns or configured metaphor terms
@@ -133,7 +137,8 @@ lectito inspect <url> --text > meta/examples/clean/example.txt
 - detecting phrases across files with one matcher
 - case-insensitive matching
 - duplicate pattern ids fail validation
-- duplicate phrases either fail validation or are reported deterministically
+- duplicate phrases fail validation
+- empty pattern ids, names, phrase lists, and phrases fail validation
 - clean examples produce no findings, or only expected low-noise findings
 - slop examples produce expected pattern ids
 

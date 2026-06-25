@@ -2,6 +2,8 @@
 
 pub mod char_class;
 
+use std::{error::Error, fmt};
+
 use aho_corasick::{AhoCorasick, MatchKind};
 
 use crate::patterns::{Pattern, PatternLoadError, PatternValidationError, Severity};
@@ -113,6 +115,30 @@ pub enum DetectorBuildError {
     PatternValidation(PatternValidationError),
     /// The Aho-Corasick automaton could not be built.
     AhoCorasick(aho_corasick::BuildError),
+}
+
+impl fmt::Display for DetectorBuildError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PatternLoad(error) => write!(formatter, "{error}"),
+            Self::PatternValidation(error) => {
+                write!(formatter, "invalid pattern dictionary: {error}")
+            }
+            Self::AhoCorasick(error) => {
+                write!(formatter, "failed to build phrase matcher: {error}")
+            }
+        }
+    }
+}
+
+impl Error for DetectorBuildError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::PatternLoad(error) => Some(error),
+            Self::PatternValidation(error) => Some(error),
+            Self::AhoCorasick(error) => Some(error),
+        }
+    }
 }
 
 impl From<PatternLoadError> for DetectorBuildError {
