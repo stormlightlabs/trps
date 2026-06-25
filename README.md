@@ -41,6 +41,12 @@ I got nerd-sniped on [BlueSky](https://bsky.app/profile/samuel.fm/post/3mp3l3cxg
 >
 > You know that feeling of nerd-sniping about to happen? I gotta use aho-corasick + [tropes.fyi](https://tropes.fyi) in some way
 
+## Further Reading
+
+[Wikipedia Article](https://en.wikipedia.org/wiki/Wikipedia%3ASigns_of_AI_writing)
+
+[Directory of tropes](https://tropes.fyi/directory)
+
 ## License
 
 [unlicense](./LICENSE)
