@@ -31,3 +31,68 @@ phrases = [
   "think of it like",
   "it's like asking",
 ]
+
+[[patterns]]
+id = "tone.imagine_world"
+name = "Imagine a World Where"
+severity = "medium"
+phrases = [
+  "imagine a world where",
+  "in that world",
+]
+
+[[patterns]]
+id = "tone.false_vulnerability"
+name = "False Vulnerability"
+severity = "medium"
+phrases = [
+  "and yes,",
+  "since we're being honest",
+  "this is not a rant",
+  "it's a diagnosis",
+]
+
+[[patterns]]
+id = "tone.truth_is_simple"
+name = "The Truth Is Simple"
+severity = "medium"
+phrases = [
+  "the reality is simpler",
+  "history is unambiguous",
+  "history is clear",
+  "the metrics are clear",
+  "the examples are clear",
+  "the real story is",
+]
+
+[[patterns]]
+id = "tone.grandiose_stakes"
+name = "Grandiose Stakes Inflation"
+severity = "medium"
+phrases = [
+  "fundamentally reshape",
+  "how we think about everything",
+  "the next era",
+  "something entirely new",
+]
+
+[[patterns]]
+id = "tone.vague_attributions"
+name = "Vague Attributions"
+severity = "medium"
+phrases = [
+  "experts argue",
+  "industry reports suggest",
+  "observers have cited",
+  "several publications",
+]
+
+[[patterns]]
+id = "tone.invented_concept_labels"
+name = "Invented Concept Labels"
+severity = "medium"
+phrases = [
+  "supervision paradox",
+  "acceleration trap",
+  "workload creep",
+]

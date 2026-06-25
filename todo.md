@@ -2,8 +2,7 @@
 
 ## Shape
 
-- `meta/tropes.md` is source material only. Do not parse it in the runtime
-  pipeline.
+- `meta/tropes.md` is source material only.
 - Pattern dictionaries live in `crates/core/src/patterns/*.toml` so contributors
   can add focused rule files without editing one giant dictionary.
 - `crates/core` owns:
@@ -39,8 +38,70 @@ phrases = [
 ]
 ```
 
-Keep the first pass phrase-only. Add structural rules later only when phrase
-matching proves insufficient.
+## Trope Coverage Checklist
+
+Current phrase coverage: 22 of 33 source sections.
+
+- [x] Quietly and Other Magic Adverbs
+- [x] Delve and Friends
+- [x] Tapestry and Landscape
+- [x] The Serves As Dodge
+- [x] Negative Parallelism
+- [x] Not X. Not Y. Just Z.
+- [x] The X? A Y.
+- [ ] Anaphora Abuse - structural detector
+- [ ] Tricolon Abuse - structural detector
+- [x] It's Worth Noting
+- [x] Superficial Analyses
+- [x] False Ranges
+- [ ] Short Punchy Fragments - structural detector
+- [ ] Listicle in a Trench Coat - structural detector
+- [x] Here's the Kicker
+- [x] Think of It As
+- [x] Imagine a World Where
+- [x] False Vulnerability
+- [x] The Truth Is Simple
+- [x] Grandiose Stakes Inflation
+- [x] Let's Break This Down
+- [x] Vague Attributions
+- [x] Invented Concept Labels
+- [x] Em-Dash Addiction
+- [ ] Bold-First Bullets - markdown-aware detector
+- [ ] Unicode Decoration - character-class detector
+- [ ] Fractal Summaries - structural detector
+- [ ] The Dead Metaphor - repetition detector
+- [ ] Historical Analogy Stacking - structural detector
+- [ ] One-Point Dilution - semantic or repetition detector
+- [ ] Content Duplication - repetition detector
+- [x] The Signposted Conclusion
+- [x] Despite Its Challenges
+
+## Non-Aho-Corasick Rules
+
+Aho-Corasick is for literal phrase signals.
+
+Separate rule types are for when the trope depends on structure, repetition,
+markdown syntax, or document-level shape.
+
+- Anaphora Abuse: split into sentences and flag repeated sentence starts within
+  a short window.
+- Tricolon Abuse: detect repeated clause patterns and dense comma/semicolon
+  triples, not just fixed phrases.
+- Short Punchy Fragments: measure runs of very short sentences or paragraph
+  fragments.
+- Listicle in a Trench Coat: detect paragraph openings like `The first`, `The
+second`, `The third` across adjacent paragraphs.
+- Bold-First Bullets: parse markdown list items and flag bullets that start with
+  bold text.
+- Unicode Decoration: scan for configured Unicode punctuation and symbols.
+- Fractal Summaries: detect repeated summary/conclusion signposts at section
+  boundaries.
+- The Dead Metaphor: count repeated uncommon nouns or configured metaphor terms
+  across a document.
+- Historical Analogy Stacking: detect runs of named examples and comparison
+  verbs across adjacent sentences.
+- One-Point Dilution: likely needs repetition or semantic similarity scoring.
+- Content Duplication: compare normalized paragraphs or sentence shingles.
 
 ## CLI
 
@@ -60,27 +121,13 @@ Behavior:
 
 ## Test Bed
 
-Add examples that exercise both obvious matches and normal prose. Keep them as
-plain text fixtures so tests do not need network access.
-
-Suggested layout:
-
-```text
-meta/examples/
-  ai-slop/
-  clean/
-```
-
-Use the local `lectito` CLI to extract article text into fixtures when useful:
+Use the `lectito` CLI to extract article text into fixtures when useful:
 
 ```text
 lectito inspect <url> --text > meta/examples/clean/example.txt
 ```
 
-Do not make tests depend on `lectito` or the network. Use it only to prepare
-fixtures that are checked into the repo.
-
-Core tests should cover:
+### Unit Tests
 
 - loading multiple `crates/core/src/patterns/*.toml` files
 - detecting phrases across files with one matcher
@@ -90,7 +137,7 @@ Core tests should cover:
 - clean examples produce no findings, or only expected low-noise findings
 - slop examples produce expected pattern ids
 
-CLI smoke tests should cover:
+### Integration Tests
 
 - file input
 - stdin input

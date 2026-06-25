@@ -1,0 +1,10 @@
+[[patterns]]
+id = "composition.despite_challenges"
+name = "Despite Its Challenges"
+severity = "medium"
+phrases = [
+  "despite these challenges",
+  "despite its",
+  "faces challenges",
+  "for broader adoption",
+]

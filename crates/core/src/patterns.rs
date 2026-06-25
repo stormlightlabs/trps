@@ -4,6 +4,10 @@ pub const BUNDLED_PATTERN_FILES: &[(&str, &str)] = &[
         "sentence-structure.toml",
         include_str!("patterns/sentence-structure.toml"),
     ),
+    (
+        "composition.toml",
+        include_str!("patterns/composition.toml"),
+    ),
     ("tone.toml", include_str!("patterns/tone.toml")),
     (
         "word-choice.toml",
@@ -11,14 +15,12 @@ pub const BUNDLED_PATTERN_FILES: &[(&str, &str)] = &[
     ),
 ];
 
-pub fn bundled_patterns() -> Result<Vec<Pattern>, toml::de::Error> {
-    let mut patterns = Vec::new();
-
-    for (_, input) in BUNDLED_PATTERN_FILES {
-        patterns.extend(PatternFile::from_toml(input)?.patterns);
-    }
-
-    Ok(patterns)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Severity {
+    Low,
+    Medium,
+    High,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
@@ -40,12 +42,14 @@ pub struct Pattern {
     pub phrases: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Severity {
-    Low,
-    Medium,
-    High,
+pub fn bundled_patterns() -> Result<Vec<Pattern>, toml::de::Error> {
+    let mut patterns = Vec::new();
+
+    for (_, input) in BUNDLED_PATTERN_FILES {
+        patterns.extend(PatternFile::from_toml(input)?.patterns);
+    }
+
+    Ok(patterns)
 }
 
 #[cfg(test)]

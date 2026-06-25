@@ -31,3 +31,36 @@ phrases = [
   "interestingly",
   "notably",
 ]
+
+[[patterns]]
+id = "sentence_structure.not_x_not_y"
+name = "Not X. Not Y. Just Z."
+severity = "high"
+phrases = [
+  "not a bug. not a feature",
+  "not ten. not fifty",
+  "not recklessly, not completely",
+]
+
+[[patterns]]
+id = "sentence_structure.superficial_analyses"
+name = "Superficial Analyses"
+severity = "medium"
+phrases = [
+  "highlighting its importance",
+  "reflecting broader trends",
+  "contributing to the development",
+  "underscoring its role",
+  "shaping its identity",
+]
+
+[[patterns]]
+id = "sentence_structure.false_ranges"
+name = "False Ranges"
+severity = "medium"
+phrases = [
+  "from innovation to",
+  "from problem-solving",
+  "to cultural transformation",
+  "to scientific discovery",
+]
