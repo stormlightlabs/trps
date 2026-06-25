@@ -75,8 +75,8 @@ fn print_finding(finding: &Finding) {
         finding
             .rule_id
             .if_supports_color(Stream::Stdout, |text| text.bold()),
-        finding.start,
-        finding.end,
+        finding.span.start(),
+        finding.span.end(),
         finding
             .matched
             .if_supports_color(Stream::Stdout, |text| text.yellow())

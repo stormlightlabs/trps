@@ -4,12 +4,6 @@ use crate::patterns::Severity;
 
 use super::Finding;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Span {
-    start: usize,
-    end: usize,
-}
-
 /// Finds structural trope signals in text.
 pub fn scan_structural(text: &str) -> Vec<Finding> {
     let sentences = sentence_spans(text);
@@ -25,7 +19,7 @@ pub fn scan_structural(text: &str) -> Vec<Finding> {
     findings
 }
 
-fn scan_anaphora(text: &str, sentences: &[Span]) -> Vec<Finding> {
+fn scan_anaphora(text: &str, sentences: &[super::Span]) -> Vec<Finding> {
     let starts: Vec<_> = sentences
         .iter()
         .filter_map(|sentence| sentence_start_key(text, *sentence).map(|key| (*sentence, key)))
@@ -40,18 +34,17 @@ fn scan_anaphora(text: &str, sentences: &[Span]) -> Vec<Finding> {
                 "Anaphora Abuse",
                 Severity::Medium,
                 text,
-                window[0].0.start,
-                window[2].0.end,
+                super::Span(window[0].0.start(), window[2].0.end()),
             )
         })
         .collect()
 }
 
-fn scan_tricolon(text: &str, sentences: &[Span]) -> Vec<Finding> {
+fn scan_tricolon(text: &str, sentences: &[super::Span]) -> Vec<Finding> {
     sentences
         .iter()
         .filter(|sentence| {
-            let value = &text[sentence.start..sentence.end];
+            let value = &text[sentence.start()..sentence.end()];
             let separators = value.matches(',').count() + value.matches(';').count();
             separators >= 2 && repeated_clause_starts(value) >= 2
         })
@@ -61,23 +54,22 @@ fn scan_tricolon(text: &str, sentences: &[Span]) -> Vec<Finding> {
                 "Tricolon Abuse",
                 Severity::Medium,
                 text,
-                sentence.start,
-                sentence.end,
+                super::Span(sentence.start(), sentence.end()),
             )
         })
         .collect()
 }
 
-fn scan_short_punchy_fragments(text: &str, sentences: &[Span]) -> Vec<Finding> {
+fn scan_short_punchy_fragments(text: &str, sentences: &[super::Span]) -> Vec<Finding> {
     let mut findings = Vec::new();
     let mut run_start = None;
     let mut run_end = 0;
     let mut run_len = 0;
 
     for sentence in sentences {
-        if word_count(&text[sentence.start..sentence.end]) <= 4 {
-            run_start.get_or_insert(sentence.start);
-            run_end = sentence.end;
+        if word_count(&text[sentence.start()..sentence.end()]) <= 4 {
+            run_start.get_or_insert(sentence.start());
+            run_end = sentence.end();
             run_len += 1;
         } else {
             if run_len >= 3 {
@@ -86,8 +78,7 @@ fn scan_short_punchy_fragments(text: &str, sentences: &[Span]) -> Vec<Finding> {
                     "Short Punchy Fragments",
                     Severity::Medium,
                     text,
-                    run_start.unwrap(),
-                    run_end,
+                    super::Span(run_start.unwrap(), run_end),
                 ));
             }
             run_start = None;
@@ -102,19 +93,18 @@ fn scan_short_punchy_fragments(text: &str, sentences: &[Span]) -> Vec<Finding> {
             "Short Punchy Fragments",
             Severity::Medium,
             text,
-            run_start.unwrap(),
-            run_end,
+            super::Span(run_start.unwrap(), run_end),
         ));
     }
 
     findings
 }
 
-fn scan_listicle_in_trench_coat(text: &str, paragraphs: &[Span]) -> Vec<Finding> {
+fn scan_listicle_in_trench_coat(text: &str, paragraphs: &[super::Span]) -> Vec<Finding> {
     let mut ordinal_hits = Vec::new();
 
     for paragraph in paragraphs {
-        if paragraph_starts_with_ordinal(&text[paragraph.start..paragraph.end]) {
+        if paragraph_starts_with_ordinal(&text[paragraph.start()..paragraph.end()]) {
             ordinal_hits.push(*paragraph);
         }
     }
@@ -127,18 +117,17 @@ fn scan_listicle_in_trench_coat(text: &str, paragraphs: &[Span]) -> Vec<Finding>
                 "Listicle in a Trench Coat",
                 Severity::Medium,
                 text,
-                window[0].start,
-                window[2].end,
+                super::Span(window[0].start(), window[2].end()),
             )
         })
         .collect()
 }
 
-fn scan_fractal_summaries(text: &str, paragraphs: &[Span]) -> Vec<Finding> {
+fn scan_fractal_summaries(text: &str, paragraphs: &[super::Span]) -> Vec<Finding> {
     let mut hits = Vec::new();
 
     for paragraph in paragraphs {
-        let value = text[paragraph.start..paragraph.end].trim_start();
+        let value = text[paragraph.start()..paragraph.end()].trim_start();
         if starts_with_any_ci(
             value,
             &[
@@ -163,18 +152,17 @@ fn scan_fractal_summaries(text: &str, paragraphs: &[Span]) -> Vec<Finding> {
         "Fractal Summaries",
         Severity::Medium,
         text,
-        hits[0].start,
-        hits[hits.len() - 1].end,
+        super::Span(hits[0].start(), hits[hits.len() - 1].end()),
     )]
 }
 
-fn scan_historical_analogy_stacking(text: &str, sentences: &[Span]) -> Vec<Finding> {
+fn scan_historical_analogy_stacking(text: &str, sentences: &[super::Span]) -> Vec<Finding> {
     sentences
         .windows(3)
         .filter(|window| {
             window
                 .iter()
-                .all(|sentence| has_analogy_marker(&text[sentence.start..sentence.end]))
+                .all(|sentence| has_analogy_marker(&text[sentence.start()..sentence.end()]))
         })
         .map(|window| {
             Finding::structural(
@@ -182,14 +170,13 @@ fn scan_historical_analogy_stacking(text: &str, sentences: &[Span]) -> Vec<Findi
                 "Historical Analogy Stacking",
                 Severity::Medium,
                 text,
-                window[0].start,
-                window[2].end,
+                super::Span(window[0].start(), window[2].end()),
             )
         })
         .collect()
 }
 
-fn sentence_spans(text: &str) -> Vec<Span> {
+fn sentence_spans(text: &str) -> Vec<super::Span> {
     let mut spans = Vec::new();
     let mut start = 0;
 
@@ -204,7 +191,7 @@ fn sentence_spans(text: &str) -> Vec<Span> {
     spans
 }
 
-fn paragraph_spans(text: &str) -> Vec<Span> {
+fn paragraph_spans(text: &str) -> Vec<super::Span> {
     let mut spans = Vec::new();
     let mut start = 0;
 
@@ -217,7 +204,7 @@ fn paragraph_spans(text: &str) -> Vec<Span> {
     spans
 }
 
-fn push_trimmed_span(text: &str, spans: &mut Vec<Span>, start: usize, end: usize) {
+fn push_trimmed_span(text: &str, spans: &mut Vec<super::Span>, start: usize, end: usize) {
     let value = &text[start..end];
     let trimmed = value.trim();
 
@@ -227,15 +214,11 @@ fn push_trimmed_span(text: &str, spans: &mut Vec<Span>, start: usize, end: usize
 
     let leading = value.len() - value.trim_start().len();
     let trailing = value.len() - value.trim_end().len();
-
-    spans.push(Span {
-        start: start + leading,
-        end: end - trailing,
-    });
+    spans.push(super::Span(start + leading, end - trailing));
 }
 
-fn sentence_start_key(text: &str, sentence: Span) -> Option<String> {
-    let words = words(&text[sentence.start..sentence.end]);
+fn sentence_start_key(text: &str, sentence: super::Span) -> Option<String> {
+    let words = words(&text[sentence.start()..sentence.end()]);
 
     if words.is_empty() {
         None

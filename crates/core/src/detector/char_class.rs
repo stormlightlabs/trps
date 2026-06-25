@@ -21,8 +21,7 @@ pub fn scan_unicode_decoration(text: &str) -> Vec<Finding> {
             severity: Severity::Low,
             kind: FindingKind::CharacterClass,
             matched: character.to_string(),
-            start,
-            end: start + character.len_utf8(),
+            span: super::Span(start, start + character.len_utf8()),
         })
         .collect()
 }
@@ -37,8 +36,8 @@ mod tests {
 
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].matched, "→");
-        assert_eq!(findings[0].start, 6);
-        assert_eq!(findings[0].end, 9);
+        assert_eq!(findings[0].span.start(), 6);
+        assert_eq!(findings[0].span.end(), 9);
     }
 
     #[test]

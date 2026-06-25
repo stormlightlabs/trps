@@ -10,16 +10,43 @@ from [Tropes.fyi](https://tropes.fyi)
 ```text
 Text
   ↓
-Normalize text
-  ↓
 Aho-Corasick phrase matcher
   ↓
-Regex / parser structural rules
+Structural, repetition, and character-class detectors
   ↓
-Feature scoring
-  ↓
-Report
+Findings report
 ```
+
+## Usage
+
+Scan text from stdin:
+
+```sh
+printf 'Let us delve into this robust ecosystem.' | cargo run -q -p tropius-cli
+```
+
+Scan article text extracted from a live URL with [lectito](https://lectito.stormlightlabs.org/):
+
+```sh
+lectito 'https://www.solo.io/blog/what-is-agent-identity-human-workload-a-new-layer' \
+    --format text \
+    | cargo run -q -p tropius-cli
+```
+
+The CLI exits `0` when no findings are found and `1` when it finds trope signals.
+
+It exits `2` for usage or configuration errors.
+
+Color output respects [`NO_COLOR`](https://no-color.org/).
+
+## Coverage
+
+Current coverage includes:
+
+- phrase patterns for 22 of 33 trope.fyi sections
+- structural detectors for sentence and paragraph shape
+- repetition detectors for repeated metaphor terms and duplicated content
+- character-class detection for Unicode decoration
 
 ## Inspiration
 

@@ -57,7 +57,8 @@ impl Detector {
         let mut findings = self.scan_phrases(text);
         findings.extend(char_class::scan_unicode_decoration(text));
         findings.extend(structural::scan_structural(text));
-        findings.sort_by_key(|finding| finding.start);
+        findings.extend(repetition::scan_repetition(text));
+        findings.sort_by_key(|finding| finding.span.start());
         findings
     }
 
@@ -74,8 +75,7 @@ impl Detector {
                     severity: pattern.severity,
                     kind: FindingKind::Phrase,
                     matched: text[mat.start()..mat.end()].to_owned(),
-                    start: mat.start(),
-                    end: mat.end(),
+                    span: Span(mat.start(), mat.end()),
                 }
             })
             .collect()
@@ -95,10 +95,8 @@ pub struct Finding {
     pub kind: FindingKind,
     /// Matched text slice.
     pub matched: String,
-    /// Start byte offset.
-    pub start: usize,
-    /// End byte offset.
-    pub end: usize,
+    /// Start & end byte offset.
+    pub span: Span,
 }
 
 impl Finding {
@@ -107,17 +105,33 @@ impl Finding {
         rule_name: &str,
         severity: Severity,
         text: &str,
-        start: usize,
-        end: usize,
+        span: Span,
     ) -> Finding {
         Finding {
             rule_id: rule_id.to_owned(),
             rule_name: rule_name.to_owned(),
             severity,
             kind: FindingKind::Structural,
-            matched: text[start..end].to_owned(),
-            start,
-            end,
+            matched: text[span.start()..span.end()].to_owned(),
+            span,
+        }
+    }
+
+    /// Builds a repetition finding from a byte range in the scanned text.
+    pub fn repetition(
+        rule_id: &str,
+        rule_name: &str,
+        severity: Severity,
+        text: &str,
+        span: Span,
+    ) -> Finding {
+        Finding {
+            rule_id: rule_id.to_owned(),
+            rule_name: rule_name.to_owned(),
+            severity,
+            kind: FindingKind::Repetition,
+            matched: text[span.start()..span.end()].to_owned(),
+            span,
         }
     }
 }
@@ -131,6 +145,8 @@ pub enum FindingKind {
     CharacterClass,
     /// Document or sentence structure matched by heuristic detectors.
     Structural,
+    /// Repeated document content matched by repetition detectors.
+    Repetition,
 }
 
 impl Display for FindingKind {
@@ -139,6 +155,7 @@ impl Display for FindingKind {
             FindingKind::Phrase => "phrase",
             FindingKind::CharacterClass => "char",
             FindingKind::Structural => "struct",
+            FindingKind::Repetition => "repeat",
         })
     }
 }
@@ -146,6 +163,19 @@ impl Display for FindingKind {
 impl FindingKind {
     pub fn label(self) -> String {
         self.to_string()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span(pub usize, pub usize);
+
+impl Span {
+    pub fn start(&self) -> usize {
+        self.0
+    }
+
+    pub fn end(&self) -> usize {
+        self.1
     }
 }
 

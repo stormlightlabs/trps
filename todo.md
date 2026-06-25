@@ -41,7 +41,7 @@ phrases = [
 ## Trope Coverage Checklist
 
 Current phrase coverage: 22 of 33 source sections.
-Implemented non-Aho detectors: 7.
+Implemented non-Aho detectors: 10.
 
 - [x] Quietly and Other Magic Adverbs
 - [x] Delve and Friends
@@ -70,10 +70,10 @@ Implemented non-Aho detectors: 7.
 - [ ] Bold-First Bullets - markdown-aware detector
 - [x] Unicode Decoration - character-class detector
 - [x] Fractal Summaries - structural detector
-- [ ] The Dead Metaphor - repetition detector
+- [x] The Dead Metaphor - repetition detector
 - [x] Historical Analogy Stacking - structural detector
-- [ ] One-Point Dilution - repetition detector (or semantic)
-- [ ] Content Duplication - repetition detector
+- [x] One-Point Dilution - repetition detector
+- [x] Content Duplication - repetition detector
 - [x] The Signposted Conclusion
 - [x] Despite Its Challenges
 
@@ -128,7 +128,7 @@ Behavior:
 Use the `lectito` CLI to extract article text into fixtures when useful:
 
 ```text
-lectito inspect <url> --text > meta/examples/clean/example.txt
+lectito --format text <url> > meta/examples/clean/example.txt
 ```
 
 ### Unit Tests
