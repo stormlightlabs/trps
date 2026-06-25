@@ -1,0 +1,33 @@
+[[patterns]]
+id = "tone.false_suspense"
+name = "Here's the Kicker"
+severity = "medium"
+phrases = [
+  "here's the kicker",
+  "here's the thing",
+  "here's where it gets interesting",
+  "here's what most people miss",
+  "here's the starting point",
+  "here's the deal",
+]
+
+[[patterns]]
+id = "tone.teacher_voice"
+name = "Let's Break This Down"
+severity = "medium"
+phrases = [
+  "let's break this down",
+  "let's unpack",
+  "let's explore",
+  "let's dive in",
+]
+
+[[patterns]]
+id = "tone.think_of_it_as"
+name = "Think of It As"
+severity = "medium"
+phrases = [
+  "think of it as",
+  "think of it like",
+  "it's like asking",
+]

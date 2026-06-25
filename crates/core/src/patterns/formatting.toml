@@ -1,0 +1,18 @@
+[[patterns]]
+id = "formatting.em_dash_addiction"
+name = "Em-Dash Addiction"
+severity = "medium"
+phrases = [
+  " -- ",
+  " — "
+]
+
+[[patterns]]
+id = "formatting.signposted_conclusion"
+name = "The Signposted Conclusion"
+severity = "low"
+phrases = [
+  "in conclusion",
+  "to sum up",
+  "in summary",
+]

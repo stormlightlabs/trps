@@ -1,0 +1,33 @@
+[[patterns]]
+id = "sentence_structure.negative_parallelism"
+name = "Negative Parallelism"
+severity = "high"
+phrases = [
+  "it's not",
+  "it is not",
+  "not because",
+  "the question isn't",
+  "the question is",
+]
+
+[[patterns]]
+id = "sentence_structure.question_answer"
+name = "The X? A Y."
+severity = "medium"
+phrases = [
+  "the result?",
+  "the worst part?",
+  "the scary part?",
+]
+
+[[patterns]]
+id = "sentence_structure.filler_transitions"
+name = "It's Worth Noting"
+severity = "medium"
+phrases = [
+  "it's worth noting",
+  "it bears mentioning",
+  "importantly",
+  "interestingly",
+  "notably",
+]

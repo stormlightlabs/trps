@@ -1,0 +1,50 @@
+[[patterns]]
+id = "word_choice.magic_adverbs"
+name = "Quietly and Other Magic Adverbs"
+severity = "medium"
+phrases = [
+  "quietly",
+  "deeply",
+  "fundamentally",
+  "remarkably",
+  "arguably",
+]
+
+[[patterns]]
+id = "word_choice.delve"
+name = "Delve and Friends"
+severity = "medium"
+phrases = [
+  "delve into",
+  "delving deeper",
+  "certainly",
+  "utilize",
+  "leverage",
+  "robust",
+  "streamline",
+  "harness",
+]
+
+[[patterns]]
+id = "word_choice.grandiose_nouns"
+name = "Tapestry and Landscape"
+severity = "medium"
+phrases = [
+  "tapestry",
+  "landscape",
+  "paradigm",
+  "synergy",
+  "ecosystem",
+  "framework",
+]
+
+[[patterns]]
+id = "word_choice.serves_as"
+name = "The Serves As Dodge"
+severity = "medium"
+phrases = [
+  "serves as",
+  "stands as",
+  "marks a pivotal",
+  "represents",
+]

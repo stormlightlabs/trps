@@ -3,8 +3,6 @@
 Add this file to your AI assistant's system prompt or context to help it avoid
 common AI writing patterns. Source: [tropes.fyi](https://tropes.fyi) by [ossama.is](https://ossama.is)
 
----
-
 ## Word Choice
 
 ### "Quietly" and Other Magic Adverbs
@@ -46,8 +44,6 @@ Replacing simple "is" or "are" with pompous alternatives like "serves as", "stan
 - "The building serves as a reminder of the city's heritage."
 - "Gallery 825 serves as LAAA's exhibition space for contemporary art."
 - "The station marks a pivotal moment in the evolution of regional transit."
-
----
 
 ## Sentence Structure
 
@@ -131,8 +127,6 @@ Using "from X to Y" constructions where X and Y aren't on any real scale. In leg
 - "From the singularity of the Big Bang to the grand cosmic web."
 - "From problem-solving and tool-making to scientific discovery, artistic expression, and technological innovation."
 
----
-
 ## Paragraph Structure
 
 ### Short Punchy Fragments
@@ -153,8 +147,6 @@ Numbered or labeled points dressed up as continuous prose. The model writes what
 
 - "The first wall is the absence of a free, scoped API... The second wall is the lack of delegated access... The third wall is the absence of scoped permissions..."
 - "The second takeaway is that... The third takeaway is that... The fourth takeaway is that..."
-
----
 
 ## Tone
 
@@ -247,8 +239,6 @@ AI clusters invented compound labels that sound analytical without being grounde
 - "the acceleration trap"
 - "workload creep"
 
----
-
 ## Formatting
 
 ### Em-Dash Addiction
@@ -280,8 +270,6 @@ Use of unicode arrows (->), smart/curly quotes, and other special characters tha
 - "Input → Processing → Output"
 - "This leads to better outcomes → which means higher engagement"
 - "“Smart quotes” instead of straight "quotes" that you’d actually type"
-
----
 
 ## Composition
 
@@ -352,8 +340,6 @@ The rigid formula where AI acknowledges problems only to immediately dismiss the
 - "Despite these challenges, the initiative continues to thrive."
 - "Despite its industrial and residential prosperity, Korattur faces challenges typical of urban areas."
 - "Despite their promising applications, pyroelectric materials face several challenges that must be addressed for broader adoption."
-
----
 
 Remember: any of these patterns used once might be fine. The problem is when
 multiple tropes appear together or when a single trope is used repeatedly.
