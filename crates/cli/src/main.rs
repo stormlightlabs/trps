@@ -1,7 +1,7 @@
 //! Command-line interface for scanning prose with bundled trope detectors.
 
+use std::fs;
 use std::{
-    fs,
     io::{self, Read},
     path::PathBuf,
     process::ExitCode,
@@ -10,7 +10,7 @@ use std::{
 use clap::Parser;
 use owo_colors::{OwoColorize, Stream};
 use tropius_core::{
-    detector::{Detector, Finding, FindingKind},
+    detector::{Detector, Finding},
     patterns::Severity,
 };
 
@@ -27,13 +27,10 @@ fn main() -> ExitCode {
     }
 
     match run(Args::parse()) {
-        Ok(has_findings) => {
-            if has_findings {
-                ExitCode::from(1)
-            } else {
-                ExitCode::SUCCESS
-            }
-        }
+        Ok(has_findings) => match has_findings {
+            true => ExitCode::from(1),
+            false => ExitCode::SUCCESS,
+        },
         Err(error) => {
             eprintln!(
                 "{} {error}",
@@ -74,7 +71,7 @@ fn print_finding(finding: &Finding) {
     println!(
         "{} {} {} {}:{} {}",
         severity_label(finding.severity),
-        kind_label(finding.kind),
+        finding.kind.label(),
         finding
             .rule_id
             .if_supports_color(Stream::Stdout, |text| text.bold()),
@@ -97,12 +94,5 @@ fn severity_label(severity: Severity) -> String {
         Severity::High => "high"
             .if_supports_color(Stream::Stdout, |text| text.red())
             .to_string(),
-    }
-}
-
-fn kind_label(kind: FindingKind) -> &'static str {
-    match kind {
-        FindingKind::Phrase => "phrase",
-        FindingKind::CharacterClass => "char",
     }
 }

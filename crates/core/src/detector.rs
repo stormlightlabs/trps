@@ -1,12 +1,15 @@
 //! Text detectors for phrase-based and structural trope signals.
 
 pub mod char_class;
+pub mod repetition;
+pub mod structural;
 
-use std::{error::Error, fmt};
+use std::fmt::Display;
 
 use aho_corasick::{AhoCorasick, MatchKind};
 
-use crate::patterns::{Pattern, PatternLoadError, PatternValidationError, Severity};
+use crate::errors::DetectorBuildError;
+use crate::patterns::{Pattern, Severity};
 use crate::patterns::{bundled_patterns, validate_patterns};
 
 /// Finds trope signals in prose.
@@ -53,6 +56,7 @@ impl Detector {
     pub fn scan(&self, text: &str) -> Vec<Finding> {
         let mut findings = self.scan_phrases(text);
         findings.extend(char_class::scan_unicode_decoration(text));
+        findings.extend(structural::scan_structural(text));
         findings.sort_by_key(|finding| finding.start);
         findings
     }
@@ -97,6 +101,27 @@ pub struct Finding {
     pub end: usize,
 }
 
+impl Finding {
+    pub fn structural(
+        rule_id: &str,
+        rule_name: &str,
+        severity: Severity,
+        text: &str,
+        start: usize,
+        end: usize,
+    ) -> Finding {
+        Finding {
+            rule_id: rule_id.to_owned(),
+            rule_name: rule_name.to_owned(),
+            severity,
+            kind: FindingKind::Structural,
+            matched: text[start..end].to_owned(),
+            start,
+            end,
+        }
+    }
+}
+
 /// The kind of detector that produced a finding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FindingKind {
@@ -104,58 +129,23 @@ pub enum FindingKind {
     Phrase,
     /// Character-class match from a structural detector.
     CharacterClass,
+    /// Document or sentence structure matched by heuristic detectors.
+    Structural,
 }
 
-/// Errors that can happen while building a detector.
-#[derive(Debug)]
-pub enum DetectorBuildError {
-    /// Bundled pattern files could not be loaded.
-    PatternLoad(PatternLoadError),
-    /// Pattern dictionaries failed validation.
-    PatternValidation(PatternValidationError),
-    /// The Aho-Corasick automaton could not be built.
-    AhoCorasick(aho_corasick::BuildError),
-}
-
-impl fmt::Display for DetectorBuildError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::PatternLoad(error) => write!(formatter, "{error}"),
-            Self::PatternValidation(error) => {
-                write!(formatter, "invalid pattern dictionary: {error}")
-            }
-            Self::AhoCorasick(error) => {
-                write!(formatter, "failed to build phrase matcher: {error}")
-            }
-        }
+impl Display for FindingKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            FindingKind::Phrase => "phrase",
+            FindingKind::CharacterClass => "char",
+            FindingKind::Structural => "struct",
+        })
     }
 }
 
-impl Error for DetectorBuildError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::PatternLoad(error) => Some(error),
-            Self::PatternValidation(error) => Some(error),
-            Self::AhoCorasick(error) => Some(error),
-        }
-    }
-}
-
-impl From<PatternLoadError> for DetectorBuildError {
-    fn from(error: PatternLoadError) -> Self {
-        Self::PatternLoad(error)
-    }
-}
-
-impl From<PatternValidationError> for DetectorBuildError {
-    fn from(error: PatternValidationError) -> Self {
-        Self::PatternValidation(error)
-    }
-}
-
-impl From<aho_corasick::BuildError> for DetectorBuildError {
-    fn from(error: aho_corasick::BuildError) -> Self {
-        Self::AhoCorasick(error)
+impl FindingKind {
+    pub fn label(self) -> String {
+        self.to_string()
     }
 }
 

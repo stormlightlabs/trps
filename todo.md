@@ -41,7 +41,7 @@ phrases = [
 ## Trope Coverage Checklist
 
 Current phrase coverage: 22 of 33 source sections.
-Implemented non-Aho detectors: 1.
+Implemented non-Aho detectors: 7.
 
 - [x] Quietly and Other Magic Adverbs
 - [x] Delve and Friends
@@ -50,13 +50,13 @@ Implemented non-Aho detectors: 1.
 - [x] Negative Parallelism
 - [x] Not X. Not Y. Just Z.
 - [x] The X? A Y.
-- [ ] Anaphora Abuse - structural detector
-- [ ] Tricolon Abuse - structural detector
+- [x] Anaphora Abuse - structural detector
+- [x] Tricolon Abuse - structural detector
 - [x] It's Worth Noting
 - [x] Superficial Analyses
 - [x] False Ranges
-- [ ] Short Punchy Fragments - structural detector
-- [ ] Listicle in a Trench Coat - structural detector
+- [x] Short Punchy Fragments - structural detector
+- [x] Listicle in a Trench Coat - structural detector
 - [x] Here's the Kicker
 - [x] Think of It As
 - [x] Imagine a World Where
@@ -69,10 +69,10 @@ Implemented non-Aho detectors: 1.
 - [x] Em-Dash Addiction
 - [ ] Bold-First Bullets - markdown-aware detector
 - [x] Unicode Decoration - character-class detector
-- [ ] Fractal Summaries - structural detector
+- [x] Fractal Summaries - structural detector
 - [ ] The Dead Metaphor - repetition detector
-- [ ] Historical Analogy Stacking - structural detector
-- [ ] One-Point Dilution - semantic or repetition detector
+- [x] Historical Analogy Stacking - structural detector
+- [ ] One-Point Dilution - repetition detector (or semantic)
 - [ ] Content Duplication - repetition detector
 - [x] The Signposted Conclusion
 - [x] Despite Its Challenges
