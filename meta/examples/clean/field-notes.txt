@@ -1,0 +1,11 @@
+The parser reads a file once and keeps the whole text in memory. Byte offsets
+point back into that buffer, so a finding can quote the exact slice it matched
+without a second pass.
+
+Each detector runs over the same buffer. Phrase matching uses one Aho-Corasick
+automaton built at startup, and the other detectors walk the text directly.
+Results are sorted by start offset before they reach the printer.
+
+Adding a rule means adding a TOML entry or a small function. Both paths end at
+the same finding type, which keeps the printer unaware of where a result came
+from.
