@@ -25,6 +25,14 @@ Scan text from stdin:
 printf 'Let us delve into this robust ecosystem.' | cargo run -q -p tropius-cli
 ```
 
+Scan files, as many as you have:
+
+```sh
+cargo run -q -p tropius-cli -- README.md docs/guide.md
+```
+
+Each file's findings are headed by its path when a run covers more than one.
+
 Scan article text extracted from a live URL with
 [lectito](https://lectito.stormlightlabs.org/):
 
@@ -42,6 +50,43 @@ The CLI exits `0` when no findings are found and `1` when it finds trope signals
 It exits `2` for usage or configuration errors.
 
 Color output respects [`NO_COLOR`](https://no-color.org/).
+
+## JSON output
+
+`--json` writes one report to stdout instead of the decorated one, for a CI job
+that has to group or summarize what a pull request changed. Exit codes do not
+change: `0` clean, `1` findings, `2` error.
+
+```json
+{
+  "version": 1,
+  "dictionary": "/home/you/project/trps.toml",
+  "findings": [
+    {
+      "rule_id": "word_choice.delve",
+      "rule_name": "Delve and Friends",
+      "severity": "medium",
+      "kind": "phrase",
+      "path": "docs/guide.md",
+      "line": 2,
+      "column": 15,
+      "matched": "delve into"
+    }
+  ]
+}
+```
+
+`version` is `1` and rises when a consumer would have to change to keep reading
+the report. `findings` is always present and is empty on a clean run.
+
+`dictionary` is the project dictionary the run applied, or `null` when it
+applied none. A discovered dictionary is reported by the absolute path the
+search resolved; `--dictionary` is reported as you wrote it.
+
+`severity` is `low`, `medium`, or `high`. `kind` names the detector that fired:
+`phrase`, `char`, `struct`, `repeat`, or `markdown`. `path` is the file as you
+named it on the command line, and `-` for text read from stdin. `line` and
+`column` are 1-based, and a column counts characters rather than bytes.
 
 ## Project dictionary
 
@@ -67,6 +112,10 @@ outside the project never reaches a scan inside it. Outside a repository only
 the working directory is searched. `trps.toml`, `tropes.toml`, and
 `tropius.toml` all work, and are searched in that order. `--dictionary <path>`
 names a file directly and skips the search.
+
+A run resolves one dictionary and applies it to every path it was given. The
+search starts at the working directory, not at each file, so run the CLI from
+the root of the project whose rules you want.
 
 Allowing a phrase removes it from the pattern that carried it and leaves the
 rest of that pattern in place: `allow = ["harness"]` stops the `harness`

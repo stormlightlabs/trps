@@ -28,7 +28,7 @@ pub const BUNDLED_PATTERN_FILES: &[(&str, &str)] = &[
 ];
 
 /// Severity attached to a pattern or detector finding.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     /// Low-confidence or low-impact signal.

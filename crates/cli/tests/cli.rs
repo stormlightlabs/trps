@@ -217,6 +217,138 @@ fn a_missing_dictionary_exits_two() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("absent.toml"));
 }
 
+#[test]
+fn several_paths_are_scanned_and_headed_by_name() {
+    let output = run(
+        None,
+        &[
+            example("slop/word-choice.txt").to_str().unwrap(),
+            example("clean/field-notes.txt").to_str().unwrap(),
+            example("slop/repetition.txt").to_str().unwrap(),
+        ],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+
+    let report = stdout(&output);
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(report.contains("slop/word-choice.txt"));
+    assert!(report.contains("slop/repetition.txt"));
+    assert!(
+        !report.contains("clean/field-notes.txt"),
+        "a file with no findings should not be headed"
+    );
+}
+
+#[test]
+fn an_unreadable_path_among_several_exits_two_before_reporting() {
+    let output = run(
+        None,
+        &[
+            example("slop/word-choice.txt").to_str().unwrap(),
+            example("clean/nothing-here.txt").to_str().unwrap(),
+        ],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(stdout(&output), "");
+    assert!(String::from_utf8_lossy(&output.stderr).contains("failed to read"));
+}
+
+#[test]
+fn json_locates_a_finding_by_path_line_and_column() {
+    let directory = case_dir("json-location");
+    write(
+        &directory,
+        "input.md",
+        "The parser reads a file once.\nA caf\u{e9} and we delve into the logs.\n",
+    );
+
+    let output = run(Some(&directory), &["--json", "input.md"], "", &[]);
+
+    assert_eq!(output.status.code(), Some(1));
+
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&output)).expect("the report is JSON");
+
+    assert_eq!(report["version"], 1);
+
+    let finding = report["findings"]
+        .as_array()
+        .expect("findings is an array")
+        .iter()
+        .find(|finding| finding["rule_id"] == "word_choice.delve")
+        .expect("the delve pattern is reported");
+
+    assert_eq!(finding["kind"], "phrase");
+    assert_eq!(finding["path"], "input.md");
+    assert_eq!(finding["line"], 2);
+    assert_eq!(finding["column"], 15, "columns count characters, not bytes");
+    assert_eq!(finding["matched"], "delve into");
+    assert!(finding["severity"].is_string());
+    assert!(finding["rule_name"].is_string());
+}
+
+#[test]
+fn json_names_the_dictionary_the_run_used() {
+    let directory = case_dir("json-dictionary");
+    write(&directory, "input.md", DOMAIN_PROSE);
+    write(&directory, "trps.toml", "allow = [\"harness\"]\n");
+
+    let discovered = run(Some(&directory), &["--json", "input.md"], "", &[]);
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&discovered)).expect("the report is JSON");
+
+    assert_eq!(discovered.status.code(), Some(1));
+    assert!(
+        report["dictionary"]
+            .as_str()
+            .is_some_and(|path| path.ends_with("trps.toml")),
+        "a discovered dictionary is reported by the path the run resolved"
+    );
+    assert!(!stdout(&discovered).contains("harness"));
+
+    let named = run(
+        Some(&directory),
+        &["--json", "--dictionary", "trps.toml", "input.md"],
+        "",
+        &[],
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&named)).expect("the report is JSON");
+
+    assert_eq!(report["dictionary"], "trps.toml");
+
+    let none = run(None, &["--json"], "The parser reads a file once.\n", &[]);
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&none)).expect("the report is JSON");
+
+    assert!(report["dictionary"].is_null());
+}
+
+#[test]
+fn json_over_several_paths_carries_a_clean_run_as_an_empty_list() {
+    let output = run(
+        None,
+        &[
+            "--json",
+            example("clean/field-notes.txt").to_str().unwrap(),
+            example("clean/changelog.md").to_str().unwrap(),
+        ],
+        "",
+        &[],
+    );
+
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&output)).expect("the report is JSON");
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(report["findings"].as_array().map(Vec::len), Some(0));
+}
+
 fn example(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../meta/examples")
