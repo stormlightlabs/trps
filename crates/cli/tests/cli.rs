@@ -1,8 +1,12 @@
 //! Integration tests for the `tropius` command line.
 
+use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+
+/// Prose carrying `harness` as a domain noun beside a genuine trope.
+const DOMAIN_PROSE: &str = "The capture harness will delve into the logs.\n";
 
 #[test]
 fn a_file_argument_is_scanned_and_exits_one() {
@@ -81,6 +85,138 @@ fn a_multiline_match_is_indented_under_its_finding() {
     );
 }
 
+#[test]
+fn a_named_dictionary_drops_an_allowed_phrase() {
+    let directory = case_dir("named-dictionary");
+    write(&directory, "input.md", DOMAIN_PROSE);
+    write(&directory, "empty.toml", "");
+    write(&directory, "allow.toml", "allow = [\"harness\"]\n");
+
+    let bundled = run(
+        Some(&directory),
+        &["--dictionary", "empty.toml", "input.md"],
+        "",
+        &[],
+    );
+
+    assert_eq!(bundled.status.code(), Some(1));
+    assert!(stdout(&bundled).contains("harness"));
+
+    let extended = run(
+        Some(&directory),
+        &["--dictionary", "allow.toml", "input.md"],
+        "",
+        &[],
+    );
+
+    assert_eq!(extended.status.code(), Some(1));
+    assert!(!stdout(&extended).contains("harness"));
+    assert!(stdout(&extended).contains("word_choice.delve"));
+}
+
+#[test]
+fn a_discovered_dictionary_applies_without_a_flag() {
+    let directory = case_dir("discovered-dictionary");
+    write(&directory, "input.md", DOMAIN_PROSE);
+    write(&directory, "trps.toml", "allow = [\"harness\"]\n");
+
+    let output = run(Some(&directory), &["input.md"], "", &[]);
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(!stdout(&output).contains("harness"));
+    assert!(stdout(&output).contains("word_choice.delve"));
+}
+
+#[test]
+fn a_named_dictionary_is_taken_over_a_discovered_one() {
+    let directory = case_dir("dictionary-precedence");
+    write(&directory, "input.md", DOMAIN_PROSE);
+    write(&directory, "trps.toml", "allow = [\"harness\"]\n");
+    write(&directory, "named.toml", "allow = [\"delve into\"]\n");
+
+    let output = run(
+        Some(&directory),
+        &["--dictionary", "named.toml", "input.md"],
+        "",
+        &[],
+    );
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stdout(&output).contains("harness"));
+    assert!(!stdout(&output).contains("delve into"));
+}
+
+#[test]
+fn a_declared_pattern_wins_an_overlap_with_a_bundled_phrase() {
+    let directory = case_dir("overlapping-dictionary");
+    write(
+        &directory,
+        "input.md",
+        "The landscape architecture review is done.\n",
+    );
+    write(
+        &directory,
+        "trps.toml",
+        r#"
+[[patterns]]
+id = "project.landscape_architecture"
+name = "Landscape Architecture"
+severity = "high"
+phrases = ["landscape architecture"]
+"#,
+    );
+
+    let output = run(Some(&directory), &["input.md"], "", &[]);
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stdout(&output).contains("project.landscape_architecture"));
+    assert!(!stdout(&output).contains("word_choice.grandiose_nouns"));
+}
+
+#[test]
+fn a_dictionary_repeating_a_pattern_id_exits_two() {
+    let directory = case_dir("duplicate-id-dictionary");
+    write(&directory, "input.md", DOMAIN_PROSE);
+    write(
+        &directory,
+        "trps.toml",
+        r#"
+[[patterns]]
+id = "project.dup"
+name = "First"
+severity = "low"
+phrases = ["bounded"]
+
+[[patterns]]
+id = "project.dup"
+name = "Second"
+severity = "high"
+phrases = ["contract"]
+"#,
+    );
+
+    let output = run(Some(&directory), &["input.md"], "", &[]);
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("duplicate pattern id `project.dup`"));
+}
+
+#[test]
+fn a_missing_dictionary_exits_two() {
+    let directory = case_dir("missing-dictionary");
+    write(&directory, "input.md", DOMAIN_PROSE);
+
+    let output = run(
+        Some(&directory),
+        &["--dictionary", "absent.toml", "input.md"],
+        "",
+        &[],
+    );
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("absent.toml"));
+}
+
 fn example(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../meta/examples")
@@ -90,6 +226,21 @@ fn example(relative: &str) -> PathBuf {
 /// Runs the binary over a file or stdin, with the color environment cleared
 /// so only the variables a test sets are in play.
 fn scan(path: Option<&Path>, input: &str, environment: &[(&str, &str)]) -> Output {
+    let arguments: Vec<&str> = path
+        .map(|path| path.to_str().expect("example paths are utf-8"))
+        .into_iter()
+        .collect();
+
+    run(None, &arguments, input, environment)
+}
+
+/// Runs the binary with `arguments`, from `directory` when one is given.
+fn run(
+    directory: Option<&Path>,
+    arguments: &[&str],
+    input: &str,
+    environment: &[(&str, &str)],
+) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_tropius-cli"));
     command.env_remove("NO_COLOR");
     command.env_remove("FORCE_COLOR");
@@ -99,9 +250,11 @@ fn scan(path: Option<&Path>, input: &str, environment: &[(&str, &str)]) -> Outpu
         command.env(key, value);
     }
 
-    if let Some(path) = path {
-        command.arg(path);
+    if let Some(directory) = directory {
+        command.current_dir(directory);
     }
+
+    command.args(arguments);
 
     let mut child = command
         .stdin(Stdio::piped())
@@ -122,4 +275,22 @@ fn scan(path: Option<&Path>, input: &str, environment: &[(&str, &str)]) -> Outpu
 
 fn stdout(output: &Output) -> String {
     String::from_utf8(output.stdout.clone()).expect("stdout is utf-8")
+}
+
+/// An empty directory under the test target directory, one per case so the
+/// dictionary a case writes reaches only its own run.
+fn case_dir(name: &str) -> PathBuf {
+    let directory = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+
+    if directory.exists() {
+        fs::remove_dir_all(&directory).expect("failed to clear the case directory");
+    }
+
+    fs::create_dir_all(&directory).expect("failed to create the case directory");
+
+    directory
+}
+
+fn write(directory: &Path, name: &str, contents: &str) {
+    fs::write(directory.join(name), contents).expect("failed to write a case file");
 }
