@@ -1,8 +1,13 @@
 //! Pattern dictionary types and bundled TOML loading.
 
 use std::collections::HashSet;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::errors::{PatternLoadError, PatternValidationError};
+
+/// File name a project dictionary is discovered under.
+pub const PROJECT_DICTIONARY_FILE: &str = "tropius.toml";
 
 /// TOML files bundled into `tropius-core`.
 pub const BUNDLED_PATTERN_FILES: &[(&str, &str)] = &[
@@ -46,9 +51,19 @@ impl Severity {
 }
 
 /// A deserialized TOML pattern file.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+///
+/// The bundled dictionaries and a project dictionary share this shape. Bundled
+/// files declare patterns only; a project dictionary can also list phrases to
+/// remove from them.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PatternFile {
+    /// Phrases removed from the patterns this file is applied to, matched
+    /// case-insensitively.
+    #[serde(default)]
+    pub allow: Vec<String>,
     /// Pattern entries declared by the file.
+    #[serde(default)]
     pub patterns: Vec<Pattern>,
 }
 
@@ -83,6 +98,64 @@ pub fn bundled_patterns() -> Result<Vec<Pattern>, PatternLoadError> {
     validate_patterns(&patterns)?;
 
     Ok(patterns)
+}
+
+/// Reads a pattern file from `path`.
+pub fn load_pattern_file(path: &Path) -> Result<PatternFile, PatternLoadError> {
+    let input = fs::read_to_string(path).map_err(|source| PatternLoadError::Read {
+        path: path.display().to_string(),
+        source,
+    })?;
+
+    Ok(PatternFile::from_toml(&input)?)
+}
+
+/// Searches `start` and its ancestors for a project dictionary.
+pub fn find_project_dictionary(start: &Path) -> Option<PathBuf> {
+    start
+        .ancestors()
+        .map(|directory| directory.join(PROJECT_DICTIONARY_FILE))
+        .find(|path| path.is_file())
+}
+
+/// Applies a project dictionary to `base`.
+///
+/// Allowed phrases are removed from every pattern in `base`, and a pattern left
+/// with no phrases is dropped. A pattern the dictionary declares replaces the
+/// one in `base` with the same id, or is appended when no id matches.
+pub fn apply_dictionary(base: Vec<Pattern>, dictionary: &PatternFile) -> Vec<Pattern> {
+    let allowed: HashSet<String> = dictionary
+        .allow
+        .iter()
+        .map(|phrase| normalize(phrase))
+        .collect();
+
+    let mut patterns: Vec<Pattern> = base
+        .into_iter()
+        .filter_map(|mut pattern| {
+            pattern
+                .phrases
+                .retain(|phrase| !allowed.contains(&normalize(phrase)));
+
+            (!pattern.phrases.is_empty()).then_some(pattern)
+        })
+        .collect();
+
+    for pattern in &dictionary.patterns {
+        match patterns
+            .iter_mut()
+            .find(|existing| existing.id == pattern.id)
+        {
+            Some(existing) => *existing = pattern.clone(),
+            None => patterns.push(pattern.clone()),
+        }
+    }
+
+    patterns
+}
+
+fn normalize(phrase: &str) -> String {
+    phrase.trim().to_ascii_lowercase()
 }
 
 /// Validates pattern ids and phrases across all loaded pattern files.
@@ -120,7 +193,7 @@ pub fn validate_patterns(patterns: &[Pattern]) -> Result<(), PatternValidationEr
                 });
             }
 
-            let normalized = phrase.to_ascii_lowercase();
+            let normalized = normalize(phrase);
 
             if !phrases.insert(normalized) {
                 return Err(PatternValidationError::DuplicatePhrase {
@@ -305,5 +378,137 @@ phrases = ["delve into"]
                 id: "word_choice.delve".to_owned(),
             })
         );
+    }
+
+    #[test]
+    fn allowlist_removes_a_phrase_from_a_bundled_pattern() {
+        let dictionary = PatternFile::from_toml(r#"allow = ["harness"]"#).unwrap();
+        let patterns = apply_dictionary(bundled_patterns().unwrap(), &dictionary);
+        let delve = patterns
+            .iter()
+            .find(|pattern| pattern.id == "word_choice.delve")
+            .unwrap();
+
+        assert!(!delve.phrases.iter().any(|phrase| phrase == "harness"));
+        assert!(delve.phrases.iter().any(|phrase| phrase == "delve into"));
+    }
+
+    #[test]
+    fn allowlist_matching_ignores_case() {
+        let dictionary = PatternFile::from_toml(r#"allow = ["Harness"]"#).unwrap();
+        let patterns = apply_dictionary(bundled_patterns().unwrap(), &dictionary);
+        let delve = patterns
+            .iter()
+            .find(|pattern| pattern.id == "word_choice.delve")
+            .unwrap();
+
+        assert!(!delve.phrases.iter().any(|phrase| phrase == "harness"));
+    }
+
+    #[test]
+    fn a_pattern_whose_phrases_are_all_allowed_is_dropped() {
+        let base = vec![Pattern {
+            id: "word_choice.delve".to_owned(),
+            name: "Delve".to_owned(),
+            severity: Severity::Medium,
+            phrases: vec!["harness".to_owned()],
+        }];
+        let dictionary = PatternFile::from_toml(r#"allow = ["harness"]"#).unwrap();
+
+        assert!(apply_dictionary(base, &dictionary).is_empty());
+    }
+
+    #[test]
+    fn a_declared_pattern_replaces_the_bundled_one_with_its_id() {
+        let dictionary = PatternFile::from_toml(
+            r#"
+[[patterns]]
+id = "word_choice.delve"
+name = "Project Delve"
+severity = "low"
+phrases = ["delve into"]
+"#,
+        )
+        .unwrap();
+        let patterns = apply_dictionary(bundled_patterns().unwrap(), &dictionary);
+        let delve: Vec<_> = patterns
+            .iter()
+            .filter(|pattern| pattern.id == "word_choice.delve")
+            .collect();
+
+        assert_eq!(delve.len(), 1);
+        assert_eq!(delve[0].name, "Project Delve");
+        assert_eq!(delve[0].severity, Severity::Low);
+        assert_eq!(delve[0].phrases, ["delve into"]);
+    }
+
+    #[test]
+    fn a_declared_pattern_with_a_new_id_is_added() {
+        let dictionary = PatternFile::from_toml(
+            r#"
+[[patterns]]
+id = "project.bounded"
+name = "Bounded Without a Bound"
+severity = "high"
+phrases = ["bounded"]
+"#,
+        )
+        .unwrap();
+        let patterns = apply_dictionary(bundled_patterns().unwrap(), &dictionary);
+
+        assert!(
+            patterns
+                .iter()
+                .any(|pattern| pattern.id == "project.bounded")
+        );
+        assert!(
+            patterns
+                .iter()
+                .any(|pattern| pattern.id == "word_choice.delve")
+        );
+    }
+
+    #[test]
+    fn a_dictionary_rejects_an_unknown_field() {
+        let error = PatternFile::from_toml("allowed = [\"harness\"]").unwrap_err();
+
+        assert!(error.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn project_dictionary_is_found_in_an_ancestor_directory() {
+        let root = temp_dir("find-project-dictionary");
+        let nested = root.join("docs/guides");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(root.join(PROJECT_DICTIONARY_FILE), "allow = []\n").unwrap();
+
+        assert_eq!(
+            find_project_dictionary(&nested),
+            Some(root.join(PROJECT_DICTIONARY_FILE))
+        );
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn no_project_dictionary_is_found_without_one() {
+        let root = temp_dir("no-project-dictionary");
+        std::fs::create_dir_all(&root).unwrap();
+
+        assert_eq!(find_project_dictionary(&root), None);
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn reading_a_missing_pattern_file_reports_its_path() {
+        let path = temp_dir("missing-pattern-file").join("tropius.toml");
+        let error = load_pattern_file(&path).unwrap_err();
+
+        assert!(error.to_string().contains("tropius.toml"));
+    }
+
+    fn temp_dir(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("tropius-{name}-{}", std::process::id()))
     }
 }

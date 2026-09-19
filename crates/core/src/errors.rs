@@ -19,6 +19,15 @@ pub enum DetectorBuildError {
 /// Errors that can happen while loading bundled pattern dictionaries.
 #[derive(Debug, Error)]
 pub enum PatternLoadError {
+    /// A pattern file could not be read from disk.
+    #[error("failed to read `{path}`: {source}")]
+    Read {
+        /// The path that could not be read.
+        path: String,
+        /// The underlying filesystem error.
+        #[source]
+        source: std::io::Error,
+    },
     /// A TOML file could not be deserialized.
     #[error("failed to parse pattern TOML: {0}")]
     Toml(#[from] toml::de::Error),

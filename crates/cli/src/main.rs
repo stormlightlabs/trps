@@ -11,7 +11,9 @@ use clap::Parser;
 use owo_colors::{OwoColorize, Stream};
 use tropius_core::{
     detector::{Detector, Finding},
-    patterns::Severity,
+    patterns::{
+        Severity, apply_dictionary, bundled_patterns, find_project_dictionary, load_pattern_file,
+    },
 };
 
 #[derive(Debug, Parser)]
@@ -19,6 +21,9 @@ use tropius_core::{
 struct Args {
     /// File to scan. Reads stdin when omitted.
     input: Option<PathBuf>,
+    /// Project dictionary to apply. Defaults to the nearest `tropius.toml`.
+    #[arg(long, value_name = "PATH")]
+    dictionary: Option<PathBuf>,
 }
 
 fn main() -> ExitCode {
@@ -43,7 +48,7 @@ fn main() -> ExitCode {
 
 fn run(args: Args) -> Result<bool, String> {
     let input = read_input(args.input)?;
-    let detector = Detector::bundled().map_err(|error| error.to_string())?;
+    let detector = build_detector(args.dictionary)?;
     let findings = detector.scan(&input);
 
     for finding in &findings {
@@ -51,6 +56,23 @@ fn run(args: Args) -> Result<bool, String> {
     }
 
     Ok(!findings.is_empty())
+}
+
+fn build_detector(dictionary: Option<PathBuf>) -> Result<Detector, String> {
+    let mut patterns = bundled_patterns().map_err(|error| error.to_string())?;
+
+    let dictionary = dictionary.or_else(|| {
+        std::env::current_dir()
+            .ok()
+            .and_then(|directory| find_project_dictionary(&directory))
+    });
+
+    if let Some(path) = dictionary {
+        let file = load_pattern_file(&path).map_err(|error| error.to_string())?;
+        patterns = apply_dictionary(patterns, &file);
+    }
+
+    Detector::new(patterns).map_err(|error| error.to_string())
 }
 
 fn read_input(input: Option<PathBuf>) -> Result<String, String> {

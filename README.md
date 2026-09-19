@@ -43,6 +43,33 @@ It exits `2` for usage or configuration errors.
 
 Color output respects [`NO_COLOR`](https://no-color.org/).
 
+## Project dictionary
+
+The bundled patterns are tuned for general prose, so a repository whose domain
+vocabulary collides with them can adjust the dictionary instead of forking it.
+Write a `tropius.toml` at the root of the project:
+
+```toml
+# Phrases that leave every bundled pattern, matched case-insensitively.
+allow = ["harness", "framework"]
+
+# Patterns added in the same shape the bundled files use.
+[[patterns]]
+id = "project.bounded"
+name = "Bounded Without a Bound"
+severity = "high"
+phrases = ["bounded"]
+```
+
+The CLI looks for that file in the working directory and its ancestors.
+`--dictionary <path>` names one directly and skips the search.
+
+Allowing a phrase removes it from the pattern that carried it and leaves the
+rest of that pattern in place: `allow = ["harness"]` stops the `harness`
+findings without disabling the other phrases in `word_choice.delve`. A pattern
+whose phrases are all allowed drops out entirely, and a pattern declared with
+the id of a bundled one replaces it.
+
 ## Coverage
 
 - an implementation path for every source section in
