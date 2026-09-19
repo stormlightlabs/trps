@@ -1,0 +1,8 @@
+Imagine a world where nobody asks for another dashboard. Here's the thing:
+in that world, somebody still builds one.
+
+Let's unpack why that happens. Think of it as a hallway where every door opens
+onto the same room. And yes, we built two of those doors ourselves.
+
+Experts argue that the supervision paradox is what makes the next era of
+tooling so hard to plan for. The reality is simpler.

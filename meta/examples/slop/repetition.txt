@@ -1,0 +1,20 @@
+In this section we look at how the cache behaves after a restart.
+
+The cache stays cold until the first request arrives, and every entry is
+fetched again from the origin.
+
+As we have seen, warming is a traffic problem rather than a storage problem.
+
+The cache stays cold until the first request arrives, and every entry is
+fetched again from the origin.
+
+A restart empties the cache, so the cache spends the quiet hours empty and
+the busy hours filling.
+
+The cache is empty after a restart, which means the cache fills during the
+busy hours instead of the quiet ones.
+
+Filling the cache during the busy hours is what a restart costs, because the
+cache is empty and the busy hours are when the cache fills.
+
+In summary, nothing warms the cache except traffic.
