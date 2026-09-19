@@ -86,8 +86,10 @@ severity = "low"
 phrases = ["harness the", "harnessing"]
 ```
 
-The noun passes and the verb still reports. A phrase a bundled pattern already
-carries has to be allowed out first, or loading fails on the duplicate.
+The noun passes and the verb still reports. A phrase carried by a bundled
+pattern you are not replacing has to be allowed out first, or loading fails on
+the duplicate. Redeclaring the pattern that carries it needs no allowlist: the
+bundled entry goes with the id.
 
 Declared patterns are matched before the bundled ones, so a project phrase wins
 where the two overlap: a rule for `landscape architecture` reports that span
