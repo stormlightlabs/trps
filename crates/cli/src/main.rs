@@ -21,7 +21,8 @@ use tropius_core::{
 struct Args {
     /// File to scan. Reads stdin when omitted.
     input: Option<PathBuf>,
-    /// Project dictionary to apply. Defaults to the nearest `tropius.toml`.
+    /// Project dictionary to apply. Defaults to the nearest `trps.toml`,
+    /// `tropes.toml`, or `tropius.toml`.
     #[arg(long, value_name = "PATH")]
     dictionary: Option<PathBuf>,
 }

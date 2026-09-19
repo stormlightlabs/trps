@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 
 use crate::errors::{PatternLoadError, PatternValidationError};
 
-/// File name a project dictionary is discovered under.
-pub const PROJECT_DICTIONARY_FILE: &str = "tropius.toml";
+/// File names a project dictionary is discovered under, in search order.
+pub const PROJECT_DICTIONARY_FILES: &[&str] = &["trps.toml", "tropes.toml", "tropius.toml"];
 
 /// TOML files bundled into `tropius-core`.
 pub const BUNDLED_PATTERN_FILES: &[(&str, &str)] = &[
@@ -111,11 +111,16 @@ pub fn load_pattern_file(path: &Path) -> Result<PatternFile, PatternLoadError> {
 }
 
 /// Searches `start` and its ancestors for a project dictionary.
+///
+/// The nearest directory holding one wins, and within a directory the first
+/// name in [`PROJECT_DICTIONARY_FILES`] wins.
 pub fn find_project_dictionary(start: &Path) -> Option<PathBuf> {
-    start
-        .ancestors()
-        .map(|directory| directory.join(PROJECT_DICTIONARY_FILE))
-        .find(|path| path.is_file())
+    start.ancestors().find_map(|directory| {
+        PROJECT_DICTIONARY_FILES
+            .iter()
+            .map(|name| directory.join(name))
+            .find(|path| path.is_file())
+    })
 }
 
 /// Applies a project dictionary to `base`.
@@ -477,14 +482,30 @@ phrases = ["bounded"]
 
     #[test]
     fn project_dictionary_is_found_in_an_ancestor_directory() {
-        let root = temp_dir("find-project-dictionary");
-        let nested = root.join("docs/guides");
-        std::fs::create_dir_all(&nested).unwrap();
-        std::fs::write(root.join(PROJECT_DICTIONARY_FILE), "allow = []\n").unwrap();
+        for name in PROJECT_DICTIONARY_FILES {
+            let root = temp_dir(&format!("find-{name}"));
+            let nested = root.join("docs/guides");
+            std::fs::create_dir_all(&nested).unwrap();
+            std::fs::write(root.join(name), "allow = []\n").unwrap();
+
+            assert_eq!(find_project_dictionary(&nested), Some(root.join(name)));
+
+            std::fs::remove_dir_all(&root).unwrap();
+        }
+    }
+
+    #[test]
+    fn the_first_dictionary_name_wins_within_a_directory() {
+        let root = temp_dir("dictionary-name-order");
+        std::fs::create_dir_all(&root).unwrap();
+
+        for name in PROJECT_DICTIONARY_FILES.iter().rev() {
+            std::fs::write(root.join(name), "allow = []\n").unwrap();
+        }
 
         assert_eq!(
-            find_project_dictionary(&nested),
-            Some(root.join(PROJECT_DICTIONARY_FILE))
+            find_project_dictionary(&root),
+            Some(root.join(PROJECT_DICTIONARY_FILES[0]))
         );
 
         std::fs::remove_dir_all(&root).unwrap();
@@ -502,10 +523,10 @@ phrases = ["bounded"]
 
     #[test]
     fn reading_a_missing_pattern_file_reports_its_path() {
-        let path = temp_dir("missing-pattern-file").join("tropius.toml");
+        let path = temp_dir("missing-pattern-file").join("trps.toml");
         let error = load_pattern_file(&path).unwrap_err();
 
-        assert!(error.to_string().contains("tropius.toml"));
+        assert!(error.to_string().contains("trps.toml"));
     }
 
     fn temp_dir(name: &str) -> PathBuf {

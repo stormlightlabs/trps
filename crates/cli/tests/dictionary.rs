@@ -25,7 +25,7 @@ fn a_named_dictionary_drops_an_allowed_phrase() {
 fn a_discovered_dictionary_applies_without_a_flag() {
     let directory = case_dir("discovered-dictionary");
     let input = write(&directory, "input.md", INPUT);
-    write(&directory, "tropius.toml", "allow = [\"harness\"]\n");
+    write(&directory, "trps.toml", "allow = [\"harness\"]\n");
 
     let report = scan(&directory, &[path(&input)]);
 
