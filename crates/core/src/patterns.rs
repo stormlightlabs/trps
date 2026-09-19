@@ -112,49 +112,73 @@ pub fn load_pattern_file(path: &Path) -> Result<PatternFile, PatternLoadError> {
 
 /// Searches `start` and its ancestors for a project dictionary.
 ///
+/// A project dictionary belongs to a repository, so the search stops at the
+/// directory holding `.git` and never reads one above it. Outside a repository
+/// only `start` is searched, which keeps a file dropped in a shared temporary
+/// directory out of every scan run from under it.
+///
 /// The nearest directory holding one wins, and within a directory the first
 /// name in [`PROJECT_DICTIONARY_FILES`] wins.
 pub fn find_project_dictionary(start: &Path) -> Option<PathBuf> {
-    start.ancestors().find_map(|directory| {
-        PROJECT_DICTIONARY_FILES
+    let repository_root = start
+        .ancestors()
+        .find(|directory| directory.join(".git").exists());
+
+    for directory in start.ancestors() {
+        let found = PROJECT_DICTIONARY_FILES
             .iter()
             .map(|name| directory.join(name))
-            .find(|path| path.is_file())
-    })
+            .find(|path| path.is_file());
+
+        if found.is_some() {
+            return found;
+        }
+
+        if repository_root.is_none_or(|root| root == directory) {
+            return None;
+        }
+    }
+
+    None
 }
 
 /// Applies a project dictionary to `base`.
 ///
 /// Allowed phrases are removed from every pattern in `base`, and a pattern left
-/// with no phrases is dropped. A pattern the dictionary declares replaces the
-/// one in `base` with the same id, or is appended when no id matches.
+/// with no phrases is dropped. A pattern the dictionary declares takes the
+/// place of the one in `base` with the same id.
+///
+/// Declared patterns come first in the returned list. The phrase matcher
+/// resolves two phrases starting at one offset in favour of the earlier
+/// pattern, so a declared phrase wins an overlap with a bundled one rather than
+/// being shadowed by it. Declared ids and phrases are left as the dictionary
+/// wrote them, so [`validate_patterns`] reports a dictionary that repeats an id
+/// the way it reports one in a bundled file.
 pub fn apply_dictionary(base: Vec<Pattern>, dictionary: &PatternFile) -> Vec<Pattern> {
     let allowed: HashSet<String> = dictionary
         .allow
         .iter()
         .map(|phrase| normalize(phrase))
         .collect();
-
-    let mut patterns: Vec<Pattern> = base
-        .into_iter()
-        .filter_map(|mut pattern| {
-            pattern
-                .phrases
-                .retain(|phrase| !allowed.contains(&normalize(phrase)));
-
-            (!pattern.phrases.is_empty()).then_some(pattern)
-        })
+    let declared: HashSet<&str> = dictionary
+        .patterns
+        .iter()
+        .map(|pattern| pattern.id.as_str())
         .collect();
 
-    for pattern in &dictionary.patterns {
-        match patterns
-            .iter_mut()
-            .find(|existing| existing.id == pattern.id)
-        {
-            Some(existing) => *existing = pattern.clone(),
-            None => patterns.push(pattern.clone()),
+    let mut patterns = dictionary.patterns.clone();
+
+    patterns.extend(base.into_iter().filter_map(|mut pattern| {
+        if declared.contains(pattern.id.as_str()) {
+            return None;
         }
-    }
+
+        pattern
+            .phrases
+            .retain(|phrase| !allowed.contains(&normalize(phrase)));
+
+        (!pattern.phrases.is_empty()).then_some(pattern)
+    }));
 
     patterns
 }
@@ -448,6 +472,54 @@ phrases = ["delve into"]
     }
 
     #[test]
+    fn declared_patterns_are_matched_before_the_bundled_ones() {
+        let dictionary = PatternFile::from_toml(
+            r#"
+[[patterns]]
+id = "project.landscape_architecture"
+name = "Landscape Architecture"
+severity = "high"
+phrases = ["landscape architecture"]
+"#,
+        )
+        .unwrap();
+        let patterns = apply_dictionary(bundled_patterns().unwrap(), &dictionary);
+        let detector = crate::detector::Detector::new(patterns).unwrap();
+        let findings = detector.scan("The landscape architecture review is done.");
+
+        assert_eq!(findings[0].rule_id, "project.landscape_architecture");
+        assert_eq!(findings[0].matched, "landscape architecture");
+    }
+
+    #[test]
+    fn a_dictionary_repeating_a_pattern_id_fails_validation() {
+        let dictionary = PatternFile::from_toml(
+            r#"
+[[patterns]]
+id = "project.dup"
+name = "First"
+severity = "low"
+phrases = ["bounded"]
+
+[[patterns]]
+id = "project.dup"
+name = "Second"
+severity = "high"
+phrases = ["contract"]
+"#,
+        )
+        .unwrap();
+        let patterns = apply_dictionary(bundled_patterns().unwrap(), &dictionary);
+
+        assert_eq!(
+            validate_patterns(&patterns),
+            Err(PatternValidationError::DuplicatePatternId {
+                id: "project.dup".to_owned(),
+            })
+        );
+    }
+
+    #[test]
     fn a_declared_pattern_with_a_new_id_is_added() {
         let dictionary = PatternFile::from_toml(
             r#"
@@ -483,7 +555,7 @@ phrases = ["bounded"]
     #[test]
     fn project_dictionary_is_found_in_an_ancestor_directory() {
         for name in PROJECT_DICTIONARY_FILES {
-            let root = temp_dir(&format!("find-{name}"));
+            let root = repository(&format!("find-{name}"));
             let nested = root.join("docs/guides");
             std::fs::create_dir_all(&nested).unwrap();
             std::fs::write(root.join(name), "allow = []\n").unwrap();
@@ -495,9 +567,37 @@ phrases = ["bounded"]
     }
 
     #[test]
-    fn the_first_dictionary_name_wins_within_a_directory() {
-        let root = temp_dir("dictionary-name-order");
+    fn the_search_stops_at_the_repository_root() {
+        let outside = temp_dir("dictionary-above-repository");
+        let root = outside.join("checkout");
         std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join(".git"), "gitdir: elsewhere\n").unwrap();
+        std::fs::write(outside.join(PROJECT_DICTIONARY_FILES[0]), "allow = []\n").unwrap();
+
+        assert_eq!(find_project_dictionary(&root), None);
+
+        std::fs::remove_dir_all(&outside).unwrap();
+    }
+
+    #[test]
+    fn outside_a_repository_only_the_starting_directory_is_searched() {
+        let root = temp_dir("dictionary-without-repository");
+        let nested = root.join("docs");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(root.join(PROJECT_DICTIONARY_FILES[0]), "allow = []\n").unwrap();
+
+        assert_eq!(find_project_dictionary(&nested), None);
+        assert_eq!(
+            find_project_dictionary(&root),
+            Some(root.join(PROJECT_DICTIONARY_FILES[0]))
+        );
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn the_first_dictionary_name_wins_within_a_directory() {
+        let root = repository("dictionary-name-order");
 
         for name in PROJECT_DICTIONARY_FILES.iter().rev() {
             std::fs::write(root.join(name), "allow = []\n").unwrap();
@@ -513,8 +613,7 @@ phrases = ["bounded"]
 
     #[test]
     fn no_project_dictionary_is_found_without_one() {
-        let root = temp_dir("no-project-dictionary");
-        std::fs::create_dir_all(&root).unwrap();
+        let root = repository("no-project-dictionary");
 
         assert_eq!(find_project_dictionary(&root), None);
 
@@ -531,5 +630,12 @@ phrases = ["bounded"]
 
     fn temp_dir(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!("tropius-{name}-{}", std::process::id()))
+    }
+
+    fn repository(name: &str) -> PathBuf {
+        let root = temp_dir(name);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join(".git"), "gitdir: elsewhere\n").unwrap();
+        root
     }
 }

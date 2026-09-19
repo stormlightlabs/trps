@@ -34,6 +34,68 @@ fn a_discovered_dictionary_applies_without_a_flag() {
 }
 
 #[test]
+fn a_declared_pattern_wins_an_overlap_with_a_bundled_phrase() {
+    let directory = case_dir("overlapping-dictionary");
+    let input = write(
+        &directory,
+        "input.md",
+        "The landscape architecture review is done.\n",
+    );
+    write(
+        &directory,
+        "trps.toml",
+        r#"
+[[patterns]]
+id = "project.landscape_architecture"
+name = "Landscape Architecture"
+severity = "high"
+phrases = ["landscape architecture"]
+"#,
+    );
+
+    let report = scan(&directory, &[path(&input)]);
+
+    assert!(
+        report.contains("project.landscape_architecture"),
+        "{report}"
+    );
+    assert!(!report.contains("word_choice.grandiose_nouns"), "{report}");
+}
+
+#[test]
+fn a_dictionary_repeating_a_pattern_id_is_a_configuration_error() {
+    let directory = case_dir("duplicate-id-dictionary");
+    let input = write(&directory, "input.md", INPUT);
+    write(
+        &directory,
+        "trps.toml",
+        r#"
+[[patterns]]
+id = "project.dup"
+name = "First"
+severity = "low"
+phrases = ["bounded"]
+
+[[patterns]]
+id = "project.dup"
+name = "Second"
+severity = "high"
+phrases = ["contract"]
+"#,
+    );
+
+    let output = Command::new(env!("CARGO_BIN_EXE_tropius-cli"))
+        .current_dir(&directory)
+        .arg(path(&input))
+        .env("NO_COLOR", "1")
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("duplicate pattern id `project.dup`"));
+}
+
+#[test]
 fn a_missing_dictionary_is_a_configuration_error() {
     let directory = case_dir("missing-dictionary");
     let input = write(&directory, "input.md", INPUT);

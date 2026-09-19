@@ -62,9 +62,11 @@ phrases = ["bounded"]
 ```
 
 The CLI looks for that file in the working directory and its ancestors, taking
-the nearest one it finds. `trps.toml`, `tropes.toml`, and `tropius.toml` all
-work, and are searched in that order. `--dictionary <path>` names a file
-directly and skips the search.
+the nearest one it finds and stopping at the repository root, so a dictionary
+outside the project never reaches a scan inside it. Outside a repository only
+the working directory is searched. `trps.toml`, `tropes.toml`, and
+`tropius.toml` all work, and are searched in that order. `--dictionary <path>`
+names a file directly and skips the search.
 
 Allowing a phrase removes it from the pattern that carried it and leaves the
 rest of that pattern in place: `allow = ["harness"]` stops the `harness`
@@ -86,6 +88,10 @@ phrases = ["harness the", "harnessing"]
 
 The noun passes and the verb still reports. A phrase a bundled pattern already
 carries has to be allowed out first, or loading fails on the duplicate.
+
+Declared patterns are matched before the bundled ones, so a project phrase wins
+where the two overlap: a rule for `landscape architecture` reports that span
+rather than losing it to the bundled `landscape`.
 
 ## Coverage
 
