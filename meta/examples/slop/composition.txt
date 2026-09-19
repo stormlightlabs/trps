@@ -1,0 +1,11 @@
+The first thing to understand is that every team builds its own ecosystem
+around the tools it already has.
+
+The second thing to understand is that an ecosystem nobody maintains becomes a
+wall between the people who build and the people who ship.
+
+The third thing to understand is that tearing down that wall costs more than
+the ecosystem ever saved, and the replacement ecosystem arrives carrying walls
+of its own.
+
+Despite these challenges, the ecosystem keeps growing.

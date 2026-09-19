@@ -1,0 +1,13 @@
+It's not bold. It's backwards. Not a bug. Not a feature. Just a habit.
+
+The rewrite touched everything from innovation to scheduling, and everything
+from problem-solving to the way the team writes a commit message.
+
+The question isn't whether the team can ship. The question is whether anyone
+reads what ships.
+
+It's worth noting that the rollout slipped, and notably the retry slipped as
+well. Interestingly, the attempt after that shipped on a Friday.
+
+The result? A release nobody could describe in one sentence,
+reflecting broader trends in how teams talk about their own work.
