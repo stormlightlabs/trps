@@ -43,6 +43,58 @@ It exits `2` for usage or configuration errors.
 
 Color output respects [`NO_COLOR`](https://no-color.org/).
 
+## Project dictionary
+
+The bundled patterns are tuned for general prose, so a repository whose domain
+vocabulary collides with them can adjust the dictionary instead of forking it.
+Write a `trps.toml` at the root of the project:
+
+```toml
+# Phrases that leave every bundled pattern, matched case-insensitively.
+allow = ["harness", "framework"]
+
+# Patterns added in the same shape the bundled files use.
+[[patterns]]
+id = "project.bounded"
+name = "Bounded Without a Bound"
+severity = "high"
+phrases = ["bounded"]
+```
+
+The CLI looks for that file in the working directory and its ancestors, taking
+the nearest one it finds and stopping at the repository root, so a dictionary
+outside the project never reaches a scan inside it. Outside a repository only
+the working directory is searched. `trps.toml`, `tropes.toml`, and
+`tropius.toml` all work, and are searched in that order. `--dictionary <path>`
+names a file directly and skips the search.
+
+Allowing a phrase removes it from the pattern that carried it and leaves the
+rest of that pattern in place: `allow = ["harness"]` stops the `harness`
+findings without disabling the other phrases in `word_choice.delve`. A pattern
+whose phrases are all allowed drops out entirely, and a pattern declared with
+the id of a bundled one replaces it.
+
+To keep a phrase but grade it differently, allow it out and declare it again:
+
+```toml
+allow = ["harness"]
+
+[[patterns]]
+id = "project.harness"
+name = "Harness the Verb"
+severity = "low"
+phrases = ["harness the", "harnessing"]
+```
+
+The noun passes and the verb still reports. A phrase carried by a bundled
+pattern you are not replacing has to be allowed out first, or loading fails on
+the duplicate. Redeclaring the pattern that carries it needs no allowlist: the
+bundled entry goes with the id.
+
+Declared patterns are matched before the bundled ones, so a project phrase wins
+where the two overlap: a rule for `landscape architecture` reports that span
+rather than losing it to the bundled `landscape`.
+
 ## Coverage
 
 - an implementation path for every source section in
