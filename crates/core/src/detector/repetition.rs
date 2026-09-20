@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 use crate::patterns::Severity;
 
-use super::{Finding, paragraph_spans, push_trimmed_span};
+use super::{Finding, paragraph_spans, sentence_spans};
 
 const DEAD_METAPHOR_TERMS: &[&str] = &[
     "ecosystem",
@@ -158,21 +158,6 @@ fn duplicate_normalized_spans(
     }
 
     findings
-}
-
-fn sentence_spans(text: &str) -> Vec<super::Span> {
-    let mut spans = Vec::new();
-    let mut start = 0;
-
-    for (index, character) in text.char_indices() {
-        if matches!(character, '.' | '!' | '?') {
-            push_trimmed_span(text, &mut spans, start, index + character.len_utf8());
-            start = index + character.len_utf8();
-        }
-    }
-
-    push_trimmed_span(text, &mut spans, start, text.len());
-    spans
 }
 
 fn word_spans(text: &str) -> Vec<super::Span> {
