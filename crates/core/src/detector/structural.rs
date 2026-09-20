@@ -30,7 +30,7 @@ pub const HISTORICAL_ANALOGY_STACKING: (&str, &str) = (
     "Historical Analogy Stacking",
 );
 
-use super::Finding;
+use super::{Finding, paragraph_spans, push_trimmed_span};
 
 /// Finds structural trope signals in text.
 pub fn scan_structural(text: &str) -> Vec<Finding> {
@@ -203,32 +203,6 @@ fn sentence_spans(text: &str) -> Vec<super::Span> {
 
     push_trimmed_span(text, &mut spans, start, text.len());
     spans
-}
-
-fn paragraph_spans(text: &str) -> Vec<super::Span> {
-    let mut spans = Vec::new();
-    let mut start = 0;
-
-    for (index, _) in text.match_indices("\n\n") {
-        push_trimmed_span(text, &mut spans, start, index);
-        start = index + 2;
-    }
-
-    push_trimmed_span(text, &mut spans, start, text.len());
-    spans
-}
-
-fn push_trimmed_span(text: &str, spans: &mut Vec<super::Span>, start: usize, end: usize) {
-    let value = &text[start..end];
-    let trimmed = value.trim();
-
-    if trimmed.is_empty() {
-        return;
-    }
-
-    let leading = value.len() - value.trim_start().len();
-    let trailing = value.len() - value.trim_end().len();
-    spans.push(super::Span(start + leading, end - trailing));
 }
 
 fn sentence_start_key(text: &str, sentence: super::Span) -> Option<String> {

@@ -129,7 +129,9 @@ pub struct Finding {
     pub severity: Severity,
     /// Detector category that produced the finding.
     pub kind: FindingKind,
-    /// Matched text slice.
+    /// The text that matched, or, for a detector that counts occurrences, the
+    /// occurrences themselves: `formatting.unicode_decoration` reports
+    /// `— — —` rather than the text between the first dash and the last.
     pub matched: String,
     /// Start & end byte offset.
     pub span: Span,
@@ -216,6 +218,46 @@ impl Span {
     pub fn end(&self) -> usize {
         self.1
     }
+}
+
+/// The blank-line separated sections of the text, each trimmed of surrounding
+/// whitespace.
+///
+/// Three detectors count per section, so the split lives here and each of them
+/// calls it. A blank line is a line holding nothing but whitespace, which is
+/// what makes the split read `\r\n\r\n` as a break; matching `"\n\n"` alone
+/// left a CRLF file as one section.
+pub(crate) fn paragraph_spans(text: &str) -> Vec<Span> {
+    let mut spans = Vec::new();
+    let mut start = 0;
+    let mut offset = 0;
+
+    for line in text.split_inclusive('\n') {
+        if line.trim().is_empty() {
+            push_trimmed_span(text, &mut spans, start, offset);
+            start = offset + line.len();
+        }
+
+        offset += line.len();
+    }
+
+    push_trimmed_span(text, &mut spans, start, text.len());
+    spans
+}
+
+/// Pushes `start..end` with surrounding whitespace trimmed off, dropping a
+/// span that holds only whitespace.
+pub(crate) fn push_trimmed_span(text: &str, spans: &mut Vec<Span>, start: usize, end: usize) {
+    let value = &text[start..end];
+
+    if value.trim().is_empty() {
+        return;
+    }
+
+    let leading = value.len() - value.trim_start().len();
+    let trailing = value.len() - value.trim_end().len();
+
+    spans.push(Span(start + leading, end - trailing));
 }
 
 /// A one-based line and column in the scanned text.
@@ -449,7 +491,8 @@ mod tests {
     #[test]
     fn a_marker_naming_a_rule_leaves_the_other_findings_alone() {
         let detector = Detector::bundled().unwrap();
-        let text = "trps-ignore-next-line word_choice.delve\nLet us delve into a → world.\n";
+        let text =
+            "trps-ignore-next-line word_choice.delve\nLet us delve into a → b → c → world.\n";
         let findings = detector.scan(text);
 
         assert!(
@@ -465,9 +508,18 @@ mod tests {
     }
 
     #[test]
+    fn sections_split_on_a_blank_line_whatever_the_line_ending() {
+        let unix = "One dash.\n\nAnother dash.\n";
+        let windows = "One dash.\r\n\r\nAnother dash.\r\n";
+
+        assert_eq!(paragraph_spans(unix).len(), 2);
+        assert_eq!(paragraph_spans(windows).len(), 2);
+    }
+
+    #[test]
     fn scan_includes_unicode_decoration() {
         let detector = Detector::bundled().unwrap();
-        let findings = detector.scan("Input → output");
+        let findings = detector.scan("Input → output → result → done");
 
         assert!(
             findings

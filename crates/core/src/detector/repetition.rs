@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 use crate::patterns::Severity;
 
-use super::Finding;
+use super::{Finding, paragraph_spans, push_trimmed_span};
 
 const DEAD_METAPHOR_TERMS: &[&str] = &[
     "ecosystem",
@@ -160,10 +160,6 @@ fn duplicate_normalized_spans(
     findings
 }
 
-fn paragraph_spans(text: &str) -> Vec<super::Span> {
-    split_spans(text, "\n\n")
-}
-
 fn sentence_spans(text: &str) -> Vec<super::Span> {
     let mut spans = Vec::new();
     let mut start = 0;
@@ -177,33 +173,6 @@ fn sentence_spans(text: &str) -> Vec<super::Span> {
 
     push_trimmed_span(text, &mut spans, start, text.len());
     spans
-}
-
-fn split_spans(text: &str, separator: &str) -> Vec<super::Span> {
-    let mut spans = Vec::new();
-    let mut start = 0;
-
-    for (index, _) in text.match_indices(separator) {
-        push_trimmed_span(text, &mut spans, start, index);
-        start = index + separator.len();
-    }
-
-    push_trimmed_span(text, &mut spans, start, text.len());
-    spans
-}
-
-fn push_trimmed_span(text: &str, spans: &mut Vec<super::Span>, start: usize, end: usize) {
-    let value = &text[start..end];
-    let trimmed = value.trim();
-
-    if trimmed.is_empty() {
-        return;
-    }
-
-    let leading = value.len() - value.trim_start().len();
-    let trailing = value.len() - value.trim_end().len();
-
-    spans.push(super::Span(start + leading, end - trailing));
 }
 
 fn word_spans(text: &str) -> Vec<super::Span> {

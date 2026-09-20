@@ -38,3 +38,6 @@ applied none. A dictionary found by the search is reported as an absolute path;
 `phrase`, `char`, `struct`, `repeat`, or `markdown`. `path` is the file as you
 named it on the command line, and `-` for text read from stdin. `line` and
 `column` are 1-based, and a column counts characters rather than bytes.
+`matched` is the text that matched, except where a rule counts occurrences:
+`formatting.unicode_decoration` lists the characters it counted, such as
+`— — —`.
