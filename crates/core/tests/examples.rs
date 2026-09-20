@@ -21,13 +21,13 @@ const SLOP_RULES: &[(&str, &[&str])] = &[
             "word_choice.grandiose_nouns",
         ],
     ),
+    ("decoration.md", &["formatting.unicode_decoration"]),
     (
         "formatting.md",
         &[
             "formatting.bold_first_bullets",
             "formatting.em_dash_addiction",
             "formatting.signposted_conclusion",
-            "formatting.unicode_decoration",
         ],
     ),
     (

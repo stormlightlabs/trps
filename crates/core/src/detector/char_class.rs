@@ -16,7 +16,8 @@ const UNICODE_DECORATION_RULE_NAME: &str = "Unicode Decoration";
 /// report a paragraph carrying one dash, one arrow, and one quoted phrase.
 ///
 /// Curly single quotes are left out: `’` is how a word processor writes an
-/// apostrophe.
+/// apostrophe. An en dash between two digits is left out by
+/// [`is_numeric_range`], which is a range rather than decoration.
 const DECORATION_CLASSES: &[&[char]] = &[&['—', '–'], &['“', '”'], &['→', '←', '↔', '⇒']];
 
 /// Occurrences of one class inside one section before it is reported.
@@ -36,7 +37,9 @@ pub fn scan_unicode_decoration(text: &str) -> Vec<Finding> {
         for class in DECORATION_CLASSES {
             let hits: Vec<_> = value
                 .char_indices()
-                .filter(|(_, character)| class.contains(character))
+                .filter(|(offset, character)| {
+                    class.contains(character) && !is_numeric_range(value, *offset, *character)
+                })
                 .map(|(offset, character)| (section.start() + offset, character))
                 .collect();
 
@@ -63,6 +66,20 @@ pub fn scan_unicode_decoration(text: &str) -> Vec<Finding> {
     }
 
     findings
+}
+
+/// Whether the character at `offset` is an en dash standing between two
+/// digits, as `2019–2021` does. A range is what the en dash is for.
+fn is_numeric_range(value: &str, offset: usize, character: char) -> bool {
+    if character != '–' {
+        return false;
+    }
+
+    let before = value[..offset].chars().next_back();
+    let after = value[offset + character.len_utf8()..].chars().next();
+
+    before.is_some_and(|before| before.is_ascii_digit())
+        && after.is_some_and(|after| after.is_ascii_digit())
 }
 
 #[cfg(test)]
@@ -95,7 +112,19 @@ mod tests {
     fn reports_each_class_that_repeats() {
         let findings = scan_unicode_decoration("A — b — c — d, “e”, “f”, and “g”");
 
-        assert_eq!(findings.len(), 2);
+        let matched: Vec<_> = findings
+            .iter()
+            .map(|finding| finding.matched.as_str())
+            .collect();
+
+        assert_eq!(matched, ["— — —", "“ ” “ ” “ ”"]);
+    }
+
+    #[test]
+    fn ignores_en_dashes_between_digits() {
+        let ranges = "The window ran 2019–2021, the audit 2022–2023, and the review 2024–2025.";
+
+        assert!(scan_unicode_decoration(ranges).is_empty());
     }
 
     #[test]

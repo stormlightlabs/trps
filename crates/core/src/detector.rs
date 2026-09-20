@@ -129,7 +129,9 @@ pub struct Finding {
     pub severity: Severity,
     /// Detector category that produced the finding.
     pub kind: FindingKind,
-    /// Matched text slice.
+    /// The text that matched, or, for a detector that counts occurrences, the
+    /// occurrences themselves: `formatting.unicode_decoration` reports
+    /// `— — —` rather than the text between the first dash and the last.
     pub matched: String,
     /// Start & end byte offset.
     pub span: Span,
@@ -222,14 +224,21 @@ impl Span {
 /// whitespace.
 ///
 /// Three detectors count per section, so the split lives here and each of them
-/// calls it.
+/// calls it. A blank line is a line holding nothing but whitespace, which is
+/// what makes the split read `\r\n\r\n` as a break; matching `"\n\n"` alone
+/// left a CRLF file as one section.
 pub(crate) fn paragraph_spans(text: &str) -> Vec<Span> {
     let mut spans = Vec::new();
     let mut start = 0;
+    let mut offset = 0;
 
-    for (index, _) in text.match_indices("\n\n") {
-        push_trimmed_span(text, &mut spans, start, index);
-        start = index + 2;
+    for line in text.split_inclusive('\n') {
+        if line.trim().is_empty() {
+            push_trimmed_span(text, &mut spans, start, offset);
+            start = offset + line.len();
+        }
+
+        offset += line.len();
     }
 
     push_trimmed_span(text, &mut spans, start, text.len());
@@ -496,6 +505,15 @@ mod tests {
                 .iter()
                 .any(|finding| finding.rule_id == char_class::UNICODE_DECORATION_RULE_ID)
         );
+    }
+
+    #[test]
+    fn sections_split_on_a_blank_line_whatever_the_line_ending() {
+        let unix = "One dash.\n\nAnother dash.\n";
+        let windows = "One dash.\r\n\r\nAnother dash.\r\n";
+
+        assert_eq!(paragraph_spans(unix).len(), 2);
+        assert_eq!(paragraph_spans(windows).len(), 2);
     }
 
     #[test]
