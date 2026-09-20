@@ -1,0 +1,8 @@
+The cache was disabled for performance reasons we can name: warming it cost
+more than it saved on a path that runs twice a day.
+
+In other words, the numbers reversed after the traffic shift.
+It is possible that they reverse again, so the flag stays where it is.
+
+The retry count is two, and this is by design: a third attempt outlived the
+lock it was waiting on and took the row with it.

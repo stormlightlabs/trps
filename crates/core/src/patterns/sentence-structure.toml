@@ -2,6 +2,7 @@
 id = "sentence_structure.negative_parallelism"
 name = "Negative Parallelism"
 severity = "high"
+sources = ["tropes.fyi"]
 phrases = [
   "it's not",
   "it is not",
@@ -14,6 +15,7 @@ phrases = [
 id = "sentence_structure.question_answer"
 name = "The X? A Y."
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "the result?",
   "the worst part?",
@@ -24,6 +26,7 @@ phrases = [
 id = "sentence_structure.filler_transitions"
 name = "It's Worth Noting"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "it's worth noting",
   "it bears mentioning",
@@ -36,6 +39,7 @@ phrases = [
 id = "sentence_structure.not_x_not_y"
 name = "Not X. Not Y. Just Z."
 severity = "high"
+sources = ["tropes.fyi"]
 phrases = [
   "not a bug. not a feature",
   "not ten. not fifty",
@@ -46,6 +50,7 @@ phrases = [
 id = "sentence_structure.superficial_analyses"
 name = "Superficial Analyses"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "highlighting its importance",
   "reflecting broader trends",
@@ -58,9 +63,40 @@ phrases = [
 id = "sentence_structure.false_ranges"
 name = "False Ranges"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "from innovation to",
   "from problem-solving",
   "to cultural transformation",
   "to scientific discovery",
+]
+
+[[patterns]]
+id = "sentence_structure.impersonal_hedge"
+name = "It Could Be Argued"
+severity = "medium"
+sources = ["vale-ai-slop"]
+phrases = [
+  "it could be argued",
+  "it can be argued",
+  "it may be said",
+  "it might be assumed",
+  "it is possible that",
+  "there is a possibility that",
+]
+
+[[patterns]]
+id = "sentence_structure.hedge_stack"
+name = "Stacked Qualifiers"
+severity = "low"
+sources = ["vale-llm-slop", "humanizer"]
+phrases = [
+  "could potentially",
+  "might arguably",
+  "generally speaking",
+  "to some extent",
+  "more often than not",
+  "in many ways",
+  "for the most part",
+  "to be fair",
 ]
