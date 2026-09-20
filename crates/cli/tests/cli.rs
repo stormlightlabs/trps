@@ -72,12 +72,12 @@ fn a_multiline_match_is_indented_under_its_finding() {
         stdout(&output),
         concat!(
             "⚠ medium sentence_structure.anaphora_abuse\n",
-            "  ├─ struct 0:55\n",
+            "  ├─ struct 1:1-3:18\n",
             "  └─ We built it fast.\n",
             "     We built it wrong.\n",
             "     We built it twice.\n",
             "⚠ medium paragraph_structure.short_punchy_fragments\n",
-            "  ├─ struct 0:55\n",
+            "  ├─ struct 1:1-3:18\n",
             "  └─ We built it fast.\n",
             "     We built it wrong.\n",
             "     We built it twice.\n",
@@ -218,7 +218,7 @@ fn a_missing_dictionary_exits_two() {
 }
 
 #[test]
-fn several_paths_are_scanned_and_headed_by_name() {
+fn several_paths_are_scanned_and_each_finding_names_its_file() {
     let output = run(
         None,
         &[
@@ -233,11 +233,11 @@ fn several_paths_are_scanned_and_headed_by_name() {
     let report = stdout(&output);
 
     assert_eq!(output.status.code(), Some(1));
-    assert!(report.contains("slop/word-choice.txt"));
-    assert!(report.contains("slop/repetition.txt"));
+    assert!(report.contains("slop/word-choice.txt:1:7-16"));
+    assert!(report.contains("slop/repetition.txt:"));
     assert!(
         !report.contains("clean/field-notes.txt"),
-        "a file with no findings should not be headed"
+        "a file with no findings should not appear at all"
     );
 }
 
@@ -347,6 +347,53 @@ fn json_over_several_paths_carries_a_clean_run_as_an_empty_list() {
 
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(report["findings"].as_array().map(Vec::len), Some(0));
+}
+
+#[test]
+fn a_file_finding_reports_the_path_line_and_column() {
+    let path = example("slop/word-choice.txt");
+    let output = scan(Some(&path), "", &[("NO_COLOR", "1")]);
+
+    let expected = format!("  ├─ phrase {}:1:7-16\n", path.display());
+    assert!(
+        stdout(&output).contains(&expected),
+        "expected {expected:?} in:\n{}",
+        stdout(&output)
+    );
+}
+
+#[test]
+fn a_stdin_finding_reports_the_line_and_column_alone() {
+    let output = scan(
+        None,
+        "A clean opening line.\nLet us delve into this.\n",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(
+        stdout(&output),
+        concat!(
+            "⚠ medium word_choice.delve\n",
+            "  ├─ phrase 2:8-17\n",
+            "  └─ delve into\n",
+        )
+    );
+}
+
+#[test]
+fn crlf_text_reports_the_same_place_as_lf_text() {
+    let prose = "A clean opening line.\nLet us delve into this.\n";
+    let environment = [("NO_COLOR", "1")];
+
+    let lf = scan(None, prose, &environment);
+    let crlf = scan(None, &prose.replace('\n', "\r\n"), &environment);
+
+    assert!(
+        stdout(&lf).contains("  ├─ phrase 2:8-17\n"),
+        "{}",
+        stdout(&lf)
+    );
+    assert_eq!(stdout(&crlf), stdout(&lf));
 }
 
 fn example(relative: &str) -> PathBuf {
