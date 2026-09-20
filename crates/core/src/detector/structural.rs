@@ -1,5 +1,32 @@
 //! Structural detectors for trope signals that are not literal phrase matches.
 
+/// Three sentences opening with the same words.
+pub const ANAPHORA_ABUSE: (&str, &str) = ("sentence_structure.anaphora_abuse", "Anaphora Abuse");
+
+/// A sentence built as a three-part list.
+pub const TRICOLON_ABUSE: (&str, &str) = ("sentence_structure.tricolon_abuse", "Tricolon Abuse");
+
+/// A run of short declarative sentences.
+pub const SHORT_PUNCHY_FRAGMENTS: (&str, &str) = (
+    "paragraph_structure.short_punchy_fragments",
+    "Short Punchy Fragments",
+);
+
+/// Prose carrying an ordinal list without being a list.
+pub const LISTICLE_IN_TRENCH_COAT: (&str, &str) = (
+    "paragraph_structure.listicle_in_trench_coat",
+    "Listicle in a Trench Coat",
+);
+
+/// A summary of the summary of the summary.
+pub const FRACTAL_SUMMARIES: (&str, &str) = ("composition.fractal_summaries", "Fractal Summaries");
+
+/// Three analogies to history stacked in a row.
+pub const HISTORICAL_ANALOGY_STACKING: (&str, &str) = (
+    "composition.historical_analogy_stacking",
+    "Historical Analogy Stacking",
+);
+
 use super::Finding;
 
 /// Finds structural trope signals in text.
@@ -28,7 +55,7 @@ fn scan_anaphora(text: &str, sentences: &[super::Span]) -> Vec<Finding> {
         .filter(|window| window[0].1 == window[1].1 && window[1].1 == window[2].1)
         .map(|window| {
             Finding::structural(
-                ("sentence_structure.anaphora_abuse", "Anaphora Abuse"),
+                ANAPHORA_ABUSE,
                 text,
                 super::Span(window[0].0.start(), window[2].0.end()),
             )
@@ -46,7 +73,7 @@ fn scan_tricolon(text: &str, sentences: &[super::Span]) -> Vec<Finding> {
         })
         .map(|sentence| {
             Finding::structural(
-                ("sentence_structure.tricolon_abuse", "Tricolon Abuse"),
+                TRICOLON_ABUSE,
                 text,
                 super::Span(sentence.start(), sentence.end()),
             )
@@ -68,10 +95,7 @@ fn scan_short_punchy_fragments(text: &str, sentences: &[super::Span]) -> Vec<Fin
         } else {
             if run_len >= 3 {
                 findings.push(Finding::structural(
-                    (
-                        "paragraph_structure.short_punchy_fragments",
-                        "Short Punchy Fragments",
-                    ),
+                    SHORT_PUNCHY_FRAGMENTS,
                     text,
                     super::Span(run_start.unwrap(), run_end),
                 ));
@@ -84,10 +108,7 @@ fn scan_short_punchy_fragments(text: &str, sentences: &[super::Span]) -> Vec<Fin
 
     if run_len >= 3 {
         findings.push(Finding::structural(
-            (
-                "paragraph_structure.short_punchy_fragments",
-                "Short Punchy Fragments",
-            ),
+            SHORT_PUNCHY_FRAGMENTS,
             text,
             super::Span(run_start.unwrap(), run_end),
         ));
@@ -109,10 +130,7 @@ fn scan_listicle_in_trench_coat(text: &str, paragraphs: &[super::Span]) -> Vec<F
         .windows(3)
         .map(|window| {
             Finding::structural(
-                (
-                    "paragraph_structure.listicle_in_trench_coat",
-                    "Listicle in a Trench Coat",
-                ),
+                LISTICLE_IN_TRENCH_COAT,
                 text,
                 super::Span(window[0].start(), window[2].end()),
             )
@@ -145,7 +163,7 @@ fn scan_fractal_summaries(text: &str, paragraphs: &[super::Span]) -> Vec<Finding
     }
 
     vec![Finding::structural(
-        ("composition.fractal_summaries", "Fractal Summaries"),
+        FRACTAL_SUMMARIES,
         text,
         super::Span(hits[0].start(), hits[hits.len() - 1].end()),
     )]
@@ -161,10 +179,7 @@ fn scan_historical_analogy_stacking(text: &str, sentences: &[super::Span]) -> Ve
         })
         .map(|window| {
             Finding::structural(
-                (
-                    "composition.historical_analogy_stacking",
-                    "Historical Analogy Stacking",
-                ),
+                HISTORICAL_ANALOGY_STACKING,
                 text,
                 super::Span(window[0].start(), window[2].end()),
             )

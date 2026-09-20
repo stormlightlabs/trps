@@ -12,6 +12,26 @@ use aho_corasick::{AhoCorasick, MatchKind};
 use crate::errors::DetectorBuildError;
 use crate::patterns::{Pattern, Severity};
 use crate::patterns::{bundled_patterns, validate_patterns};
+use crate::suppression::Suppressions;
+
+/// Rule ids the detectors compiled into this crate can report.
+///
+/// The phrase rules come out of the loaded dictionaries, so [`Detector`] holds
+/// those; these have no dictionary entry to read. Anything asking whether a
+/// rule id exists needs both, which [`Detector::rule_ids`] joins.
+pub const BUILTIN_RULE_IDS: &[&str] = &[
+    char_class::UNICODE_DECORATION_RULE_ID,
+    markdown::BOLD_FIRST_BULLETS.0,
+    repetition::CONTENT_DUPLICATION.0,
+    repetition::DEAD_METAPHOR.0,
+    repetition::ONE_POINT_DILUTION.0,
+    structural::ANAPHORA_ABUSE.0,
+    structural::FRACTAL_SUMMARIES.0,
+    structural::HISTORICAL_ANALOGY_STACKING.0,
+    structural::LISTICLE_IN_TRENCH_COAT.0,
+    structural::SHORT_PUNCHY_FRAGMENTS.0,
+    structural::TRICOLON_ABUSE.0,
+];
 
 /// Finds trope signals in prose.
 #[derive(Debug)]
@@ -53,13 +73,27 @@ impl Detector {
         })
     }
 
+    /// Every rule id this detector can report.
+    pub fn rule_ids(&self) -> impl Iterator<Item = &str> + Clone {
+        self.phrase_patterns
+            .iter()
+            .map(|pattern| pattern.id.as_str())
+            .chain(BUILTIN_RULE_IDS.iter().copied())
+    }
+
     /// Scans text with all enabled detectors.
+    ///
+    /// Findings the text suppressed in place are dropped here rather than by
+    /// the caller, so every reader of a scan sees the same document.
     pub fn scan(&self, text: &str) -> Vec<Finding> {
+        let suppressions = Suppressions::new(text);
         let mut findings = self.scan_phrases(text);
+
         findings.extend(char_class::scan_unicode_decoration(text));
         findings.extend(markdown::scan_markdown(text));
         findings.extend(structural::scan_structural(text));
         findings.extend(repetition::scan_repetition(text));
+        findings.retain(|finding| !suppressions.covers(finding.span.start(), &finding.rule_id));
         findings.sort_by_key(|finding| finding.span.start());
         findings
     }
@@ -391,6 +425,42 @@ mod tests {
         assert_eq!(
             index.locate(delve.span.start()),
             Location { line: 2, column: 8 }
+        );
+    }
+
+    #[test]
+    fn a_scan_drops_the_findings_the_text_suppressed() {
+        let detector = Detector::bundled().unwrap();
+        let text = "trps-ignore-next-line\nLet us delve into this.\nLet us delve into that.\n";
+        let findings = detector.scan(text);
+        let delve: Vec<_> = findings
+            .iter()
+            .filter(|finding| finding.rule_id == "word_choice.delve")
+            .collect();
+
+        assert_eq!(delve.len(), 1);
+        assert_eq!(
+            LineIndex::new(text).locate(delve[0].span.start()).line,
+            3,
+            "only the marked line is suppressed"
+        );
+    }
+
+    #[test]
+    fn a_marker_naming_a_rule_leaves_the_other_findings_alone() {
+        let detector = Detector::bundled().unwrap();
+        let text = "trps-ignore-next-line word_choice.delve\nLet us delve into a → world.\n";
+        let findings = detector.scan(text);
+
+        assert!(
+            !findings
+                .iter()
+                .any(|finding| finding.rule_id == "word_choice.delve")
+        );
+        assert!(
+            findings
+                .iter()
+                .any(|finding| finding.rule_id == char_class::UNICODE_DECORATION_RULE_ID)
         );
     }
 

@@ -3,7 +3,7 @@
 use std::fs;
 use std::{
     io::{self, Read},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::ExitCode,
 };
 
@@ -12,9 +12,11 @@ use owo_colors::{OwoColorize, Stream};
 use serde::Serialize;
 use tropius_core::{
     detector::{Detector, Finding, LineIndex, Location},
+    excludes::Excludes,
     patterns::{
         Severity, apply_dictionary, bundled_patterns, find_project_dictionary, load_pattern_file,
     },
+    suppression::Suppressions,
 };
 
 /// Name the JSON report gives to text read from stdin.
@@ -36,6 +38,15 @@ struct Args {
     /// Report findings as JSON on stdout instead of a decorated report.
     #[arg(long)]
     json: bool,
+}
+
+/// What a run's project dictionary decides: the detector built from it, the
+/// paths it keeps out of the scan, and the file itself so the JSON report can
+/// name it.
+struct Rules {
+    detector: Detector,
+    excludes: Excludes,
+    dictionary: Option<PathBuf>,
 }
 
 /// Text to scan, under the name the report gives it.
@@ -86,29 +97,31 @@ fn main() -> ExitCode {
 }
 
 fn run(args: Args) -> Result<bool, String> {
-    let sources = read_sources(args.inputs)?;
-    let (detector, dictionary) = build_detector(args.dictionary)?;
+    let rules = build_rules(args.dictionary)?;
+    let sources = read_sources(args.inputs, &rules.excludes)?;
 
     let scanned: Vec<(Source, Vec<Finding>)> = sources
         .into_iter()
         .map(|source| {
-            let findings = detector.scan(&source.text);
+            let findings = rules.detector.scan(&source.text);
             (source, findings)
         })
         .collect();
 
+    warn_unknown_rules(&scanned, &rules.detector);
+
     match args.json {
-        true => print_json(&scanned, dictionary)?,
+        true => print_json(&scanned, rules.dictionary)?,
         false => print_report(&scanned),
     }
 
     Ok(scanned.iter().any(|(_, findings)| !findings.is_empty()))
 }
 
-/// Builds the one detector a run applies to every path, and returns the
-/// dictionary it was built from so the JSON report can name it.
-fn build_detector(dictionary: Option<PathBuf>) -> Result<(Detector, Option<PathBuf>), String> {
+/// Resolves the one dictionary a run applies to every path.
+fn build_rules(dictionary: Option<PathBuf>) -> Result<Rules, String> {
     let mut patterns = bundled_patterns().map_err(|error| error.to_string())?;
+    let mut excludes = Excludes::default();
 
     let dictionary = dictionary.or_else(|| {
         std::env::current_dir()
@@ -118,17 +131,27 @@ fn build_detector(dictionary: Option<PathBuf>) -> Result<(Detector, Option<PathB
 
     if let Some(path) = &dictionary {
         let file = load_pattern_file(path).map_err(|error| error.to_string())?;
+        let root = path.parent().unwrap_or(Path::new("."));
+
+        excludes = Excludes::new(root, &file.exclude).map_err(|error| error.to_string())?;
         patterns = apply_dictionary(patterns, &file);
     }
 
     let detector = Detector::new(patterns).map_err(|error| error.to_string())?;
 
-    Ok((detector, dictionary))
+    Ok(Rules {
+        detector,
+        excludes,
+        dictionary,
+    })
 }
 
 /// Reads every path up front so an unreadable one fails before any report is
 /// written.
-fn read_sources(inputs: Vec<PathBuf>) -> Result<Vec<Source>, String> {
+///
+/// An excluded path is dropped before it is read, so naming one the project
+/// has excluded is not an error even when nothing is there to read.
+fn read_sources(inputs: Vec<PathBuf>, excludes: &Excludes) -> Result<Vec<Source>, String> {
     if inputs.is_empty() {
         return Ok(vec![Source {
             name: STDIN_NAME.to_owned(),
@@ -138,6 +161,7 @@ fn read_sources(inputs: Vec<PathBuf>) -> Result<Vec<Source>, String> {
 
     inputs
         .into_iter()
+        .filter(|path| !excludes.excludes(path))
         .map(|path| {
             let text = fs::read_to_string(&path)
                 .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
@@ -198,6 +222,26 @@ fn print_json(
     Ok(())
 }
 
+/// Warns about a marker naming a rule nothing reports, which suppresses
+/// nothing and would otherwise fail in silence.
+///
+/// Warnings go to stderr, so a `--json` run still writes one document to
+/// stdout, and they do not change the exit code: a typo in a marker is worth
+/// saying and not worth failing a build over.
+fn warn_unknown_rules(scanned: &[(Source, Vec<Finding>)], detector: &Detector) {
+    for (source, _) in scanned {
+        let index = LineIndex::new(&source.text);
+
+        for (rule, offset) in Suppressions::new(&source.text).unknown_rules(detector.rule_ids()) {
+            eprintln!(
+                "{} {} no rule is named `{rule}`",
+                "warning:".if_supports_color(Stream::Stderr, |text| text.yellow()),
+                in_file(&source.name, index.locate(offset).to_string()),
+            );
+        }
+    }
+}
+
 /// Prints the decorated report. Every finding names its own place, so a run
 /// over several paths needs no heading to say which file it is reading.
 fn print_report(scanned: &[(Source, Vec<Finding>)]) {
@@ -239,9 +283,15 @@ fn origin(name: &str, (start, end): (Location, Location)) -> String {
         false => format!("{start}-{end}"),
     };
 
+    in_file(name, range)
+}
+
+/// Prefixes a place in a file with the file, dropping the path for stdin,
+/// which has none.
+fn in_file(name: &str, place: String) -> String {
     match name == STDIN_NAME {
-        true => range,
-        false => format!("{name}:{range}"),
+        true => place,
+        false => format!("{name}:{place}"),
     }
 }
 

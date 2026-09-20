@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 aho-corasick = "1"
+globset = "0.4"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 toml = "1"

@@ -2,4 +2,6 @@
 
 pub mod detector;
 pub mod errors;
+pub mod excludes;
 pub mod patterns;
+pub mod suppression;
