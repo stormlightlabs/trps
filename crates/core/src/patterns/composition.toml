@@ -2,9 +2,69 @@
 id = "composition.despite_challenges"
 name = "Despite Its Challenges"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "despite these challenges",
   "despite its",
   "faces challenges",
   "for broader adoption",
+]
+
+[[patterns]]
+id = "composition.throat_clearing"
+name = "Throat-Clearing Frames"
+severity = "medium"
+sources = ["vale-llm-slop"]
+phrases = [
+  "note that",
+  "please note",
+  "under the hood",
+  "behind the scenes",
+  "at a high level",
+  "to be clear",
+  "keep in mind",
+  "bear in mind",
+]
+
+[[patterns]]
+id = "composition.restatement_markers"
+name = "Restatement Markers"
+severity = "low"
+sources = ["vale-ai-slop"]
+phrases = [
+  "in other words",
+  "to put it another way",
+  "simply put",
+  "in essence",
+  "to reiterate",
+  "as mentioned above",
+  "as mentioned earlier",
+  "as noted above",
+]
+
+[[patterns]]
+id = "composition.era_framing"
+name = "In Today's Fast-Paced Era"
+severity = "medium"
+sources = ["clearmode"]
+phrases = [
+  "in today's fast-paced",
+  "in today's digital",
+  "in today's competitive",
+  "in an era of",
+  "in the age of",
+  "in the digital age",
+  "the modern era",
+  "rapidly evolving",
+]
+
+[[patterns]]
+id = "composition.vague_connection"
+name = "Associated With Something"
+severity = "medium"
+sources = ["humanizer"]
+phrases = [
+  "associated with",
+  "in association with",
+  "in connection with",
 ]

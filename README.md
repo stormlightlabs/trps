@@ -4,8 +4,10 @@
 
 ## How
 
-We use a pattern dictionary in TOML based on a [trope list](./meta/tropes.md)
-from [Tropes.fyi](https://tropes.fyi).
+We use a pattern dictionary in TOML, drawn from the published trope catalogs
+listed in [`sources.md`](./meta/sources.md). Every pattern names the catalogs
+its phrases came from, and a bundled pattern that cites one the crate does not
+know fails to load.
 
 ```text
 Text
@@ -32,6 +34,11 @@ ignore markers.
 - an implementation path for every source section in
   [`tropes.md`](https://tropes.fyi/tropes-md)
 - phrase patterns for literal trope signals
+- chat-assistant residue: narrated next steps, cutoff disclaimers, and the
+  tracking parameters and citation markup a chat tool leaves in pasted text
+- prose about code: comments that rate it, code given intentions, docstrings
+  that restate the signature, and reasons that give no reason
+- phrasings measured as over-represented in generated fiction
 - structural detectors for sentence and paragraph shape
 - repetition detectors for repeated metaphor terms and duplicated content
 - markdown-aware detection for bold-first bullets

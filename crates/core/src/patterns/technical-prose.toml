@@ -1,0 +1,64 @@
+# Tropes that show up where prose describes code: comments, docstrings, commit
+# bodies, and reference pages.
+
+[[patterns]]
+id = "technical.self_praise"
+name = "Comments That Rate the Code"
+severity = "medium"
+sources = ["vale-llm-slop"]
+phrases = [
+  "for better readability",
+  "for clarity",
+  "more maintainable",
+  "ensures correctness",
+  "handles this gracefully",
+  "handles it gracefully",
+  "best practices",
+  "the cleanest way",
+]
+
+[[patterns]]
+id = "technical.anthropomorphism"
+name = "Code With Intentions"
+severity = "low"
+sources = ["vale-llm-slop"]
+phrases = [
+  "is aware of",
+  "knows how to",
+  "will complain",
+  "wants a",
+  "expects a",
+  "is happy to",
+]
+
+[[patterns]]
+id = "technical.restates_code"
+name = "Prose That Restates the Code"
+severity = "low"
+sources = ["vale-llm-slop"]
+phrases = [
+  "this function returns",
+  "this function takes",
+  "this method returns",
+  "helper function",
+  "a thin wrapper around",
+  "simply returns",
+  "loop through the",
+  "create a new instance of",
+  "return the result",
+]
+
+[[patterns]]
+id = "technical.vague_reasons"
+name = "A Reason Without the Reason"
+severity = "medium"
+sources = ["vale-llm-slop"]
+phrases = [
+  "for various reasons",
+  "for obvious reasons",
+  "due to the nature of",
+  "for performance reasons",
+  "for legacy reasons",
+  "this is by design",
+  "as one would expect",
+]

@@ -21,6 +21,11 @@ severity = "high"
 phrases = ["bounded"]
 ```
 
+A project pattern may carry a `sources` key, the way a bundled one does, but
+nothing checks what it says: the citation is yours, and the registry of
+catalogs a bundled pattern may cite is ours. `meta/sources.md` in the
+repository lists that registry.
+
 The CLI looks for that file in the working directory and its ancestors, taking
 the nearest one it finds and stopping at the repository root, so a dictionary
 outside the project never reaches a scan inside it. Outside a repository only

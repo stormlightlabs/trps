@@ -1,0 +1,93 @@
+# Text a chat assistant produced about its own work, left in prose that has to
+# stand on its own.
+
+[[patterns]]
+id = "assistant.chat_residue"
+name = "Chat Residue"
+severity = "high"
+sources = ["vale-llm-slop", "avoid-ai-writing", "clearmode", "humanizer"]
+phrases = [
+  "i hope this helps",
+  "hope that helps",
+  "great question",
+  "excellent question",
+  "you're absolutely right",
+  "let me know if you need",
+  "feel free to reach out",
+  "as an ai",
+  "i'd be happy to",
+  "without further ado",
+  "of course!",
+]
+
+[[patterns]]
+id = "assistant.process_narration"
+name = "Narrating the Next Step"
+severity = "medium"
+sources = ["vale-llm-slop"]
+phrases = [
+  "let me check",
+  "let me analyze",
+  "let me walk you through",
+  "let me explain",
+  "i'll take a look",
+  "i'll walk through",
+  "i'm going to examine",
+]
+
+[[patterns]]
+id = "assistant.self_reference"
+name = "I Can See That"
+severity = "low"
+sources = ["vale-llm-slop"]
+phrases = [
+  "i can see that",
+  "i can tell you",
+  "i can spot",
+  "i should mention",
+  "i need to note",
+  "i have to mention",
+]
+
+[[patterns]]
+id = "assistant.cutoff_disclaimer"
+name = "Cutoff Disclaimers"
+severity = "high"
+sources = ["avoid-ai-writing", "humanizer"]
+phrases = [
+  "as of my last update",
+  "my last training update",
+  "i don't have access to real-time",
+  "based on available information",
+  "while specific details are limited",
+  "it is believed that",
+  "appears to have studied",
+]
+
+[[patterns]]
+id = "assistant.tool_residue"
+name = "Chat Tool Markup"
+severity = "high"
+sources = ["avoid-ai-writing"]
+phrases = [
+  "utm_source=chatgpt.com",
+  "utm_source=claude.ai",
+  "utm_source=perplexity.ai",
+  "utm_source=copilot.com",
+  "oai_citation",
+  "contentreference[oaicite",
+  "citeturn0search",
+]
+
+[[patterns]]
+id = "assistant.unfilled_placeholder"
+name = "Unfilled Placeholders"
+severity = "high"
+sources = ["avoid-ai-writing"]
+phrases = [
+  "[your name]",
+  "[insert source url]",
+  "[describe the",
+  "[enter your",
+  "-xx-xx",
+]

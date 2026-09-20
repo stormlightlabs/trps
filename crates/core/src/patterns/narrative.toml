@@ -1,0 +1,35 @@
+# Phrasings measured as over-represented in generated fiction. Each one is
+# ordinary on its own, so these are graded low and read as a signal only where
+# several land in one passage.
+
+[[patterns]]
+id = "narrative.body_beats"
+name = "Stock Body Beats"
+severity = "low"
+sources = ["slop-forensics"]
+phrases = [
+  "took a deep breath",
+  "voice barely a whisper",
+  "voice barely above a whisper",
+  "heart pounding in",
+  "a shiver ran down",
+  "a chill ran down",
+  "brow furrowed",
+  "eyes widened",
+]
+
+[[patterns]]
+id = "narrative.stock_imagery"
+name = "Stock Imagery"
+severity = "low"
+sources = ["slop-forensics"]
+phrases = [
+  "casting long shadows",
+  "the air was thick with",
+  "a smile playing on her lips",
+  "a smile playing on his lips",
+  "days turned into weeks",
+  "felt like an eternity",
+  "couldn't help but feel",
+  "the sun dipped below the horizon",
+]
