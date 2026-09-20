@@ -83,9 +83,14 @@ impl Detector {
 
     /// Scans text with all enabled detectors.
     ///
+    /// Fenced blocks and front matter are blanked before anything reads the
+    /// text, so no detector grades a quoted command or a metadata key.
+    ///
     /// Findings the text suppressed in place are dropped here rather than by
     /// the caller, so every reader of a scan sees the same document.
     pub fn scan(&self, text: &str) -> Vec<Finding> {
+        let masked = markdown::mask_non_prose(text);
+        let text = masked.as_str();
         let suppressions = Suppressions::new(text);
         let mut findings = self.scan_phrases(text);
 
@@ -243,6 +248,99 @@ pub(crate) fn paragraph_spans(text: &str) -> Vec<Span> {
 
     push_trimmed_span(text, &mut spans, start, text.len());
     spans
+}
+
+/// The sentences of `text`, grouped by the block of prose they sit in.
+///
+/// Four detectors count sentences and every one of them counts them inside a
+/// paragraph, so both the split and the grouping live here.
+///
+/// A sentence never reaches across a line markdown reads as structure, and a
+/// run of them never spans two blocks. Three bullets opening the same way are
+/// a list rather than anaphora, and a one-line lead-in before a list is not a
+/// run of fragments with the list's own wrapped lines.
+///
+/// A terminator inside a token does not end a sentence either: splitting on
+/// every `.` read `src/lib.rs` and `v0.1.1` as three sentences each, and a
+/// rule counting short sentences saw a path as a run of fragments.
+pub(crate) fn prose_sentences(text: &str) -> Vec<Vec<Span>> {
+    prose_blocks(text)
+        .into_iter()
+        .map(|block| split_sentences(text, block))
+        .filter(|sentences| !sentences.is_empty())
+        .collect()
+}
+
+/// Every sentence of `text` in the order it appears, with the block
+/// boundaries [`prose_sentences`] keeps dropped.
+pub(crate) fn sentence_spans(text: &str) -> Vec<Span> {
+    prose_sentences(text).concat()
+}
+
+/// Splits one block of prose into sentences.
+fn split_sentences(text: &str, block: Span) -> Vec<Span> {
+    let mut spans = Vec::new();
+    let mut start = block.start();
+
+    for (offset, character) in text[block.start()..block.end()].char_indices() {
+        let end = block.start() + offset + character.len_utf8();
+
+        if matches!(character, '.' | '!' | '?') && ends_sentence(text, end) {
+            push_trimmed_span(text, &mut spans, start, end);
+            start = end;
+        }
+    }
+
+    push_trimmed_span(text, &mut spans, start, block.end());
+    spans
+}
+
+/// Whether the terminator ending at `end` closes a sentence rather than
+/// sitting inside a token. Nothing after it, or whitespace, closes one.
+fn ends_sentence(text: &str, end: usize) -> bool {
+    text[end..].chars().next().is_none_or(char::is_whitespace)
+}
+
+/// Maximal runs of adjacent prose lines, each trimmed of surrounding
+/// whitespace.
+///
+/// A blank line ends a run and so does a line of markdown structure. An
+/// indented line under structure continues it, which is how a bullet that
+/// wraps onto a second line stays part of its bullet instead of reading as a
+/// paragraph of its own.
+fn prose_blocks(text: &str) -> Vec<Span> {
+    let mut spans = Vec::new();
+    let mut start = None;
+    let mut structure = false;
+    let mut offset = 0;
+
+    for line in text.split_inclusive('\n') {
+        let blank = line.trim().is_empty();
+
+        if !blank && markdown::is_prose_line(line) && !(structure && is_indented(line)) {
+            structure = false;
+            start.get_or_insert(offset);
+        } else {
+            structure |= !blank;
+
+            if let Some(block) = start.take() {
+                push_trimmed_span(text, &mut spans, block, offset);
+            }
+        }
+
+        offset += line.len();
+    }
+
+    if let Some(block) = start {
+        push_trimmed_span(text, &mut spans, block, text.len());
+    }
+
+    spans
+}
+
+/// Whether a line opens with enough whitespace to hang off the line above it.
+fn is_indented(line: &str) -> bool {
+    line.len() - line.trim_start().len() >= 2
 }
 
 /// Pushes `start..end` with surrounding whitespace trimmed off, dropping a
@@ -438,6 +536,67 @@ mod tests {
         let start = Location { line: 1, column: 5 };
 
         assert_eq!(index.locate_span(Span(4, 4)), (start, start));
+    }
+
+    #[test]
+    fn a_terminator_inside_a_token_does_not_end_a_sentence() {
+        let text = "The loader reads v0.1.1 from src/lib.rs at startup.";
+
+        assert_eq!(sentence_spans(text), vec![Span(0, text.len())]);
+    }
+
+    #[test]
+    fn a_sentence_ends_at_a_terminator_whitespace_follows() {
+        let text = "One sentence. Two sentences.";
+        let spans = sentence_spans(text);
+
+        assert_eq!(spans.len(), 2);
+        assert_eq!(&text[spans[0].start()..spans[0].end()], "One sentence.");
+        assert_eq!(&text[spans[1].start()..spans[1].end()], "Two sentences.");
+    }
+
+    #[test]
+    fn a_sentence_does_not_reach_across_markdown_structure() {
+        let text = "A lead-in line.\n\n- A bullet.\n\nA closing line.\n";
+        let blocks = prose_sentences(text);
+
+        assert_eq!(blocks.len(), 2, "the bullet is structure rather than prose");
+        assert_eq!(
+            &text[blocks[0][0].start()..blocks[0][0].end()],
+            "A lead-in line."
+        );
+        assert_eq!(
+            &text[blocks[1][0].start()..blocks[1][0].end()],
+            "A closing line."
+        );
+    }
+
+    #[test]
+    fn a_wrapped_bullet_stays_part_of_its_bullet() {
+        let text = "- A bullet that runs on\n  and ends here.\n\nA paragraph.\n";
+        let blocks = prose_sentences(text);
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(
+            &text[blocks[0][0].start()..blocks[0][0].end()],
+            "A paragraph."
+        );
+    }
+
+    #[test]
+    fn a_fenced_block_is_not_graded() {
+        let detector = Detector::bundled().unwrap();
+        let text = "Prose above.\n\n```text\nHe published this. Openly. In a book.\n```\n";
+
+        assert_eq!(detector.scan(text), Vec::new());
+    }
+
+    #[test]
+    fn a_run_of_bullets_sharing_an_opening_is_a_list_rather_than_anaphora() {
+        let detector = Detector::bundled().unwrap();
+        let text = "- The loader reads the file.\n- The loader merges the two.\n- The loader records the path.\n";
+
+        assert_eq!(detector.scan(text), Vec::new());
     }
 
     #[test]

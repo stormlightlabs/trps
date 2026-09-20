@@ -30,20 +30,27 @@ pub const HISTORICAL_ANALOGY_STACKING: (&str, &str) = (
     "Historical Analogy Stacking",
 );
 
-use super::{Finding, paragraph_spans, push_trimmed_span};
+use super::{Finding, paragraph_spans, prose_sentences};
 
 /// Finds structural trope signals in text.
+///
+/// The sentence rules run over one block of prose at a time, because every one
+/// of them is about sentences sitting next to each other in a paragraph. The
+/// paragraph rules read the sections instead, and a list or a table is a
+/// section of its own.
 pub fn scan_structural(text: &str) -> Vec<Finding> {
-    let sentences = sentence_spans(text);
     let paragraphs = paragraph_spans(text);
-
     let mut findings = Vec::new();
-    findings.extend(scan_anaphora(text, &sentences));
-    findings.extend(scan_tricolon(text, &sentences));
-    findings.extend(scan_short_punchy_fragments(text, &sentences));
+
+    for sentences in prose_sentences(text) {
+        findings.extend(scan_anaphora(text, &sentences));
+        findings.extend(scan_tricolon(text, &sentences));
+        findings.extend(scan_short_punchy_fragments(text, &sentences));
+        findings.extend(scan_historical_analogy_stacking(text, &sentences));
+    }
+
     findings.extend(scan_listicle_in_trench_coat(text, &paragraphs));
     findings.extend(scan_fractal_summaries(text, &paragraphs));
-    findings.extend(scan_historical_analogy_stacking(text, &sentences));
     findings
 }
 
@@ -190,21 +197,6 @@ fn scan_historical_analogy_stacking(text: &str, sentences: &[super::Span]) -> Ve
         .collect()
 }
 
-fn sentence_spans(text: &str) -> Vec<super::Span> {
-    let mut spans = Vec::new();
-    let mut start = 0;
-
-    for (index, character) in text.char_indices() {
-        if matches!(character, '.' | '!' | '?') {
-            push_trimmed_span(text, &mut spans, start, index + character.len_utf8());
-            start = index + character.len_utf8();
-        }
-    }
-
-    push_trimmed_span(text, &mut spans, start, text.len());
-    spans
-}
-
 fn sentence_start_key(text: &str, sentence: super::Span) -> Option<String> {
     let words = words(&text[sentence.start()..sentence.end()]);
 
@@ -309,6 +301,31 @@ mod tests {
                 .iter()
                 .any(|finding| finding.rule_id == "paragraph_structure.short_punchy_fragments")
         );
+    }
+
+    #[test]
+    fn a_run_of_fragments_does_not_reach_across_a_list() {
+        let findings = scan_structural("Ask of each change:\n\n- Is it needed?\n- Is it small?\n");
+
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn anaphora_does_not_reach_across_a_paragraph_break() {
+        let findings = scan_structural(
+            "They assume users pay.\n\nThey assume builders arrive.\n\nThey assume markets form.",
+        );
+
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn a_path_is_one_word_rather_than_a_run_of_fragments() {
+        let findings = scan_structural(
+            "The loader reads `~/.config/trps/trps.toml` first, then `.trps.toml` beside it.",
+        );
+
+        assert!(findings.is_empty());
     }
 
     #[test]
