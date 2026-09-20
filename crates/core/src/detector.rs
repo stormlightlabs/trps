@@ -184,6 +184,66 @@ impl Span {
     }
 }
 
+/// A one-based line and column in the scanned text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Location {
+    /// One-based line number.
+    pub line: usize,
+    /// One-based column, counted in characters rather than bytes.
+    pub column: usize,
+}
+
+impl Display for Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
+    }
+}
+
+/// Resolves byte offsets in scanned text to lines and columns.
+///
+/// Findings keep byte offsets; a reader needs a line. Building the index once
+/// per scan keeps that translation off the hot path of the detectors.
+#[derive(Debug)]
+pub struct LineIndex<'a> {
+    text: &'a str,
+    line_starts: Vec<usize>,
+}
+
+impl<'a> LineIndex<'a> {
+    /// Indexes the line starts of `text`.
+    pub fn new(text: &'a str) -> Self {
+        let mut line_starts = vec![0];
+        line_starts.extend(text.match_indices('\n').map(|(offset, _)| offset + 1));
+
+        Self { text, line_starts }
+    }
+
+    /// Resolves a byte offset to its line and column.
+    ///
+    /// An offset past the end of the text resolves to the end of the text.
+    /// The carriage return of a `\r\n` pair does not count as a column, so a
+    /// span reaching the end of a line reports the same column either way.
+    pub fn locate(&self, offset: usize) -> Location {
+        let offset = offset.min(self.text.len());
+        let line = self.line_starts.partition_point(|start| *start <= offset) - 1;
+        let preceding = &self.text[self.line_starts[line]..offset];
+        let preceding = preceding.strip_suffix('\r').unwrap_or(preceding);
+
+        Location {
+            line: line + 1,
+            column: preceding.chars().count() + 1,
+        }
+    }
+
+    /// Resolves a span to the location of its start and of its end.
+    ///
+    /// The end is the half-open end the span itself carries: it is the
+    /// column after the last matched character.
+    pub fn locate_span(&self, span: Span) -> (Location, Location) {
+        (self.locate(span.start()), self.locate(span.end()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,6 +272,110 @@ mod tests {
 
         assert_eq!(findings[0].rule_id, "word_choice.delve");
         assert_eq!(findings[0].matched, "DELVE INTO");
+    }
+
+    #[test]
+    fn a_line_index_locates_offsets_on_the_first_line() {
+        let index = LineIndex::new("delve into this");
+
+        assert_eq!(index.locate(0), Location { line: 1, column: 1 });
+        assert_eq!(index.locate(6), Location { line: 1, column: 7 });
+    }
+
+    #[test]
+    fn a_line_index_counts_lines_from_one() {
+        let text = "first\nsecond\n\nfourth";
+        let index = LineIndex::new(text);
+
+        assert_eq!(index.locate(6), Location { line: 2, column: 1 });
+        assert_eq!(index.locate(13), Location { line: 3, column: 1 });
+        assert_eq!(
+            index.locate(text.find("fourth").unwrap()),
+            Location { line: 4, column: 1 }
+        );
+    }
+
+    #[test]
+    fn a_column_counts_characters_rather_than_bytes() {
+        let text = "a → b";
+        let index = LineIndex::new(text);
+
+        assert_eq!(index.locate(text.find('→').unwrap()).column, 3);
+        assert_eq!(index.locate(text.find('b').unwrap()).column, 5);
+    }
+
+    #[test]
+    fn an_offset_past_the_end_resolves_to_the_end() {
+        let index = LineIndex::new("one\ntwo");
+
+        assert_eq!(index.locate(999), Location { line: 2, column: 4 });
+    }
+
+    #[test]
+    fn carriage_returns_do_not_count_as_columns() {
+        let text = "first\r\nsecond\r\n";
+        let index = LineIndex::new(text);
+
+        assert_eq!(index.locate(0), Location { line: 1, column: 1 });
+        assert_eq!(
+            index.locate(text.find('\r').unwrap()),
+            Location { line: 1, column: 6 }
+        );
+        assert_eq!(
+            index.locate(text.find("second").unwrap()),
+            Location { line: 2, column: 1 }
+        );
+    }
+
+    #[test]
+    fn a_span_locates_both_of_its_ends() {
+        let text = "one two\nthree four\n";
+        let index = LineIndex::new(text);
+
+        assert_eq!(
+            index.locate_span(Span(4, 7)),
+            (
+                Location { line: 1, column: 5 },
+                Location { line: 1, column: 8 }
+            )
+        );
+        assert_eq!(
+            index.locate_span(Span(0, 13)),
+            (
+                Location { line: 1, column: 1 },
+                Location { line: 2, column: 6 }
+            )
+        );
+    }
+
+    #[test]
+    fn a_location_displays_as_line_and_column() {
+        assert_eq!(
+            Location {
+                line: 12,
+                column: 3
+            }
+            .to_string(),
+            "12:3"
+        );
+    }
+
+    #[test]
+    fn findings_resolve_to_the_line_they_were_found_on() {
+        let detector = Detector::bundled().unwrap();
+        let text = "A clean opening line.\nLet us delve into this.\n";
+        let findings = detector.scan(text);
+        let index = LineIndex::new(text);
+
+        let delve = findings
+            .iter()
+            .find(|finding| finding.rule_id == "word_choice.delve")
+            .expect("the second line matches word_choice.delve");
+
+        assert_eq!(
+            index.locate(delve.span.start()),
+            Location { line: 2, column: 8 }
+        );
     }
 
     #[test]

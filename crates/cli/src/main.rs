@@ -11,7 +11,7 @@ use clap::Parser;
 use owo_colors::{OwoColorize, Stream};
 use serde::Serialize;
 use tropius_core::{
-    detector::{Detector, Finding},
+    detector::{Detector, Finding, LineIndex, Location},
     patterns::{
         Severity, apply_dictionary, bundled_patterns, find_project_dictionary, load_pattern_file,
     },
@@ -163,25 +163,26 @@ fn print_json(
     scanned: &[(Source, Vec<Finding>)],
     dictionary: Option<PathBuf>,
 ) -> Result<(), String> {
-    let findings = scanned
-        .iter()
-        .flat_map(|(source, findings)| {
-            findings.iter().map(|finding| {
-                let (line, column) = line_and_column(&source.text, finding.span.start());
+    let mut findings = Vec::new();
 
-                ReportFinding {
-                    rule_id: &finding.rule_id,
-                    rule_name: &finding.rule_name,
-                    severity: finding.severity,
-                    kind: finding.kind.label(),
-                    path: &source.name,
-                    line,
-                    column,
-                    matched: &finding.matched,
-                }
-            })
-        })
-        .collect();
+    for (source, source_findings) in scanned {
+        let index = LineIndex::new(&source.text);
+
+        findings.extend(source_findings.iter().map(|finding| {
+            let location = index.locate(finding.span.start());
+
+            ReportFinding {
+                rule_id: &finding.rule_id,
+                rule_name: &finding.rule_name,
+                severity: finding.severity,
+                kind: finding.kind.label(),
+                path: &source.name,
+                line: location.line,
+                column: location.column,
+                matched: &finding.matched,
+            }
+        }));
+    }
 
     let report = Report {
         version: REPORT_VERSION,
@@ -197,43 +198,19 @@ fn print_json(
     Ok(())
 }
 
-/// Prints the decorated report, heading each file's findings with its path
-/// when a run covers more than one.
+/// Prints the decorated report. Every finding names its own place, so a run
+/// over several paths needs no heading to say which file it is reading.
 fn print_report(scanned: &[(Source, Vec<Finding>)]) {
-    let name_the_source = scanned.len() > 1;
-
     for (source, findings) in scanned {
-        if findings.is_empty() {
-            continue;
-        }
-
-        if name_the_source {
-            println!(
-                "{}",
-                source
-                    .name
-                    .if_supports_color(Stream::Stdout, |text| text.bold())
-            );
-        }
+        let index = LineIndex::new(&source.text);
 
         for finding in findings {
-            print_finding(finding);
+            print_finding(finding, &source.name, &index);
         }
     }
 }
 
-/// Returns the 1-based line and character column of a byte offset.
-fn line_and_column(text: &str, offset: usize) -> (usize, usize) {
-    let before = &text[..offset];
-    let line_start = before.rfind('\n').map_or(0, |index| index + 1);
-
-    (
-        before.matches('\n').count() + 1,
-        before[line_start..].chars().count() + 1,
-    )
-}
-
-fn print_finding(finding: &Finding) {
+fn print_finding(finding: &Finding, name: &str, index: &LineIndex) {
     println!(
         "{} {} {}",
         finding.severity.symbol(),
@@ -243,15 +220,29 @@ fn print_finding(finding: &Finding) {
             .if_supports_color(Stream::Stdout, |text| text.bold()),
     );
     println!(
-        "  ├─ {} {}:{}",
+        "  ├─ {} {}",
         finding.kind.label(),
-        finding.span.start(),
-        finding.span.end(),
+        origin(name, index.locate_span(finding.span)),
     );
     println!(
         "  └─ {}",
         indented_match(&finding.matched).if_supports_color(Stream::Stdout, |text| text.yellow())
     );
+}
+
+/// Renders where a finding is, as `path:line:column-column`, dropping the
+/// path for stdin, which has none, and the end line for a finding that sits
+/// on one line.
+fn origin(name: &str, (start, end): (Location, Location)) -> String {
+    let range = match start.line == end.line {
+        true => format!("{start}-{}", end.column),
+        false => format!("{start}-{end}"),
+    };
+
+    match name == STDIN_NAME {
+        true => range,
+        false => format!("{name}:{range}"),
+    }
 }
 
 fn indented_match(value: &str) -> String {
