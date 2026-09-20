@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use crate::patterns::Severity;
 
-use super::{Finding, FindingKind, Span, paragraph_spans, word_spans};
+use super::{Finding, FindingKind, Span, paragraph_spans, reaches_rate, word_spans};
 
 /// Rule id for Unicode decoration findings.
 pub const UNICODE_DECORATION_RULE_ID: &str = "formatting.unicode_decoration";
@@ -158,7 +158,7 @@ pub fn scan_em_dash_addiction(text: &str, limits: DashLimits) -> Vec<Finding> {
     spans.sort_by_key(Span::start);
 
     let words = word_spans(text).len();
-    let dense = spans.len() >= count || spans.len() * 100 >= rate * words;
+    let dense = spans.len() >= count || reaches_rate(spans.len(), rate, words);
 
     if spans.len() < floor || !dense {
         return Vec::new();
@@ -377,6 +377,24 @@ mod tests {
 
         assert!(scan_em_dash_addiction(three, raised).is_empty());
         assert_eq!(scan_em_dash_addiction(aside, lowered).len(), 1);
+    }
+
+    /// A dictionary is input, so a rate past what the arithmetic holds has to
+    /// be an answer rather than a panic or a wrap.
+    ///
+    /// Four words times a quarter of a `usize`, rounded up, is exactly one
+    /// wrap: multiplying the two plainly panics on a debug build and reports
+    /// zero on a release one, which reads as the document being dense.
+    #[test]
+    fn a_rate_no_document_reaches_reports_nothing() {
+        let text = "A -- b -- c -- d";
+        let unreachable = DashLimits {
+            rate_per_hundred_words: usize::MAX / 4 + 1,
+            ..DashLimits::default()
+        };
+
+        assert_eq!(scan_dashes(text).len(), 1);
+        assert!(scan_em_dash_addiction(text, unreachable).is_empty());
     }
 
     #[test]

@@ -457,6 +457,20 @@ pub(crate) fn word_spans(text: &str) -> Vec<Span> {
     spans
 }
 
+/// Whether `hits` across `words` words is at least `per_hundred` of them in
+/// every hundred words.
+///
+/// The rate comes from the dictionary, which is input, so the products are
+/// saturating rather than plain. A `per_hundred` a TOML integer holds overflows
+/// `per_hundred * words` on any document worth scanning, and the rule should
+/// answer no to a rate no document reaches rather than panic on a debug build
+/// and wrap to an answer of its own on a release one. Saturation changes no
+/// answer a document can produce: only some hundred quadrillion hits reach the
+/// left side of it.
+pub(crate) fn reaches_rate(hits: usize, per_hundred: usize, words: usize) -> bool {
+    hits.saturating_mul(100) >= per_hundred.saturating_mul(words)
+}
+
 /// Pushes `start..end` with surrounding whitespace trimmed off, dropping a
 /// span that holds only whitespace.
 pub(crate) fn push_trimmed_span(text: &str, spans: &mut Vec<Span>, start: usize, end: usize) {
