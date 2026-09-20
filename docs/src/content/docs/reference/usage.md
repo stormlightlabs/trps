@@ -53,6 +53,21 @@ A sentence ends at a `.`, `!`, or `?` with whitespace or the end of the file
 after it. A terminator inside a token does not end one, so `src/lib.rs` and
 `v0.1.1` are read as single words.
 
+## A clean run
+
+A run that matches nothing says so on stderr:
+
+```text
+clean: nothing in the catalogue matched. Hedges, filler adverbs, and editorial asides are not in it.
+```
+
+A run that printed nothing would read as a verdict on the prose. Tropius
+matches a catalogue of tropes, and most of the ways writing goes wrong are
+outside it, so read the text yourself.
+
+The line goes to stderr, so a `--json` pipeline reading stdout never sees it.
+Pass `-q` or `--quiet` to drop it.
+
 ## Exit codes
 
 The CLI exits `0` when it finds nothing and `1` when it reports a trope

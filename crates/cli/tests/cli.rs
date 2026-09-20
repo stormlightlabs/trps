@@ -8,6 +8,12 @@ use std::process::{Command, Output, Stdio};
 /// Prose carrying `harness` as a domain noun beside a genuine trope.
 const DOMAIN_PROSE: &str = "The capture harness will delve into the logs.\n";
 
+/// What a run writes to stderr when nothing matched.
+const CLEAN_LINE: &str = concat!(
+    "clean: nothing in the catalogue matched. ",
+    "Hedges, filler adverbs, and editorial asides are not in it.\n"
+);
+
 #[test]
 fn a_file_argument_is_scanned_and_exits_one() {
     let output = scan(Some(&example("slop/word-choice.txt")), "", &[]);
@@ -17,11 +23,67 @@ fn a_file_argument_is_scanned_and_exits_one() {
 }
 
 #[test]
-fn a_clean_file_prints_nothing_and_exits_zero() {
-    let output = scan(Some(&example("clean/field-notes.txt")), "", &[]);
+fn a_clean_file_says_so_on_stderr_and_exits_zero() {
+    let output = scan(
+        Some(&example("clean/field-notes.txt")),
+        "",
+        &[("NO_COLOR", "1")],
+    );
 
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(stdout(&output), "");
+    assert_eq!(stderr(&output), CLEAN_LINE);
+}
+
+#[test]
+fn quiet_drops_the_clean_line_and_leaves_the_exit_code() {
+    let output = run(
+        None,
+        &[
+            "--quiet",
+            path_of(&example("clean/field-notes.txt")).as_str(),
+        ],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stderr(&output), "");
+}
+
+#[test]
+fn the_clean_line_leaves_the_json_report_alone() {
+    let directory = case_dir("clean-json");
+    write(&directory, "input.md", "The parser reads a file once.\n");
+
+    let output = run(
+        Some(&directory),
+        &["--json", "input.md"],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stderr(&output), CLEAN_LINE);
+
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&output)).expect("the report is JSON");
+
+    assert_eq!(report["findings"].as_array().expect("findings").len(), 0);
+}
+
+#[test]
+fn no_color_suppresses_the_escape_codes_in_the_clean_line() {
+    let path = example("clean/field-notes.txt");
+
+    let colored = scan(Some(&path), "", &[("FORCE_COLOR", "1")]);
+    assert!(
+        stderr(&colored).contains('\u{1b}'),
+        "the clean line should be colored when color is forced"
+    );
+
+    let plain = scan(Some(&path), "", &[("FORCE_COLOR", "1"), ("NO_COLOR", "1")]);
+    assert_eq!(stderr(&plain), CLEAN_LINE);
 }
 
 #[test]
@@ -31,10 +93,15 @@ fn stdin_is_scanned_when_no_file_is_given() {
     assert_eq!(findings.status.code(), Some(1));
     assert!(stdout(&findings).contains("word_choice.delve"));
 
-    let clean = scan(None, "The parser reads a file once.\n", &[]);
+    let clean = scan(
+        None,
+        "The parser reads a file once.\n",
+        &[("NO_COLOR", "1")],
+    );
 
     assert_eq!(clean.status.code(), Some(0));
     assert_eq!(stdout(&clean), "");
+    assert_eq!(stderr(&clean), CLEAN_LINE);
 }
 
 #[test]
@@ -501,14 +568,15 @@ fn a_marker_naming_a_rule_keeps_the_other_findings() {
 
 #[test]
 fn a_marker_naming_no_rule_warns_without_failing_the_run() {
-    let known = scan(
+    let known = run(
         None,
+        &["--quiet"],
         "<!-- trps-ignore-next-line word_choice.delve -->\nLet us delve into this.\n",
         &[("NO_COLOR", "1")],
     );
 
     assert_eq!(known.status.code(), Some(0));
-    assert_eq!(String::from_utf8_lossy(&known.stderr), "");
+    assert_eq!(stderr(&known), "");
 
     let typo = scan(
         None,
@@ -700,6 +768,15 @@ fn run(
 
 fn stdout(output: &Output) -> String {
     String::from_utf8(output.stdout.clone()).expect("stdout is utf-8")
+}
+
+fn stderr(output: &Output) -> String {
+    String::from_utf8(output.stderr.clone()).expect("stderr is utf-8")
+}
+
+/// An example path as an argument string.
+fn path_of(path: &Path) -> String {
+    path.to_str().expect("example paths are utf-8").to_owned()
 }
 
 /// An empty directory under the test target directory, one per case so the

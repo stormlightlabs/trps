@@ -38,6 +38,9 @@ struct Args {
     /// Report findings as JSON on stdout instead of a decorated report.
     #[arg(long)]
     json: bool,
+    /// Do not print the line a clean run writes to stderr.
+    #[arg(short, long)]
+    quiet: bool,
 }
 
 /// What a run's project dictionary decides. The file itself is kept so the
@@ -117,7 +120,28 @@ fn run(args: Args) -> Result<bool, String> {
         false => print_report(&scanned),
     }
 
-    Ok(scanned.iter().any(|(_, findings)| !findings.is_empty()))
+    let has_findings = scanned.iter().any(|(_, findings)| !findings.is_empty());
+
+    if !has_findings && !args.quiet {
+        report_clean();
+    }
+
+    Ok(has_findings)
+}
+
+/// Says that a run matched nothing, and names prose it never read for.
+///
+/// A run that prints nothing reads as a verdict on the writing, and the
+/// catalogue is narrower than that. The line goes to stderr beside the
+/// warnings, so a `--json` run still writes one document to stdout, and
+/// `--quiet` turns it off for anyone who would otherwise send stderr to
+/// `/dev/null`.
+fn report_clean() {
+    eprintln!(
+        "{} nothing in the catalogue matched. Hedges, filler adverbs, \
+and editorial asides are not in it.",
+        "clean:".if_supports_color(Stream::Stderr, |text| text.green()),
+    );
 }
 
 /// Resolves the one dictionary a run applies to every path.
