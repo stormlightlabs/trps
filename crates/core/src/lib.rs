@@ -1,4 +1,4 @@
-//! Core detection and pattern-loading logic for `tropius`.
+//! Core detection and pattern-loading logic for Tropius.
 
 pub mod detector;
 pub mod errors;
