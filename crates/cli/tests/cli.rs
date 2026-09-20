@@ -551,6 +551,97 @@ fn a_warning_names_its_file_and_leaves_the_json_alone() {
     assert_eq!(report["findings"][0]["rule_id"], "word_choice.delve");
 }
 
+#[test]
+fn no_dialect_is_enforced_until_a_dictionary_names_one() {
+    let output = scan(None, "The judgement was coloured.\n", &[("NO_COLOR", "1")]);
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stdout(&output), "");
+}
+
+#[test]
+fn a_dialect_reports_the_other_spelling_and_the_one_it_expects() {
+    let directory = case_dir("american-dialect");
+    write(&directory, "input.md", "The judgement was coloured.\n");
+    write(&directory, "trps.toml", "dialect = \"american\"\n");
+
+    let output = run(Some(&directory), &["input.md"], "", &[("NO_COLOR", "1")]);
+
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(
+        stdout(&output),
+        concat!(
+            "⚠ medium word_choice.dialect_spelling\n",
+            "  ├─ spelling input.md:1:5-13\n",
+            "  └─ judgement → judgment\n",
+            "⚠ medium word_choice.dialect_spelling\n",
+            "  ├─ spelling input.md:1:19-26\n",
+            "  └─ coloured → colored\n",
+        )
+    );
+}
+
+#[test]
+fn a_british_dictionary_reports_the_american_spelling() {
+    let directory = case_dir("british-dialect");
+    write(&directory, "input.md", "The judgment was colored.\n");
+    write(&directory, "trps.toml", "dialect = \"british\"\n");
+
+    let output = run(Some(&directory), &["input.md"], "", &[("NO_COLOR", "1")]);
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stdout(&output).contains("judgment → judgement"));
+    assert!(stdout(&output).contains("colored → coloured"));
+}
+
+#[test]
+fn json_carries_the_expected_spelling_on_the_dialect_rule_alone() {
+    let directory = case_dir("dialect-json");
+    write(
+        &directory,
+        "input.md",
+        "The judgement will delve into the logs.\n",
+    );
+    write(&directory, "trps.toml", "dialect = \"american\"\n");
+
+    let output = run(Some(&directory), &["--json", "input.md"], "", &[]);
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&output)).expect("the report is JSON");
+    let findings = report["findings"].as_array().expect("findings are a list");
+
+    let spelling = findings
+        .iter()
+        .find(|finding| finding["rule_id"] == "word_choice.dialect_spelling")
+        .expect("the dialect rule reported");
+
+    assert_eq!(spelling["kind"], "spelling");
+    assert_eq!(spelling["matched"], "judgement");
+    assert_eq!(spelling["expected"], "judgment");
+
+    let phrase = findings
+        .iter()
+        .find(|finding| finding["rule_id"] == "word_choice.delve")
+        .expect("the phrase rule reported");
+
+    assert!(phrase.get("expected").is_none());
+}
+
+#[test]
+fn a_dialect_finding_is_suppressed_like_any_other() {
+    let directory = case_dir("dialect-suppression");
+    write(
+        &directory,
+        "input.md",
+        "<!-- trps-ignore-next-line word_choice.dialect_spelling -->\nThe judgement stands.\n",
+    );
+    write(&directory, "trps.toml", "dialect = \"american\"\n");
+
+    let output = run(Some(&directory), &["input.md"], "", &[("NO_COLOR", "1")]);
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stdout(&output), "");
+}
+
 fn example(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../meta/examples")

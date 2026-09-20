@@ -35,9 +35,14 @@ applied none. A dictionary found by the search is reported as an absolute path;
 `--dictionary` is reported as you wrote it.
 
 `severity` is `low`, `medium`, or `high`. `kind` names the detector that fired:
-`phrase`, `char`, `struct`, `repeat`, or `markdown`. `path` is the file as you
+`phrase`, `char`, `struct`, `repeat`, `markdown`, or `spelling`. `path` is the file as you
 named it on the command line, and `-` for text read from stdin. `line` and
 `column` are 1-based, and a column counts characters rather than bytes.
 `matched` is the text that matched, except where a rule counts occurrences:
 `formatting.unicode_decoration` lists the characters it counted, such as
 `— — —`.
+
+`expected` is there only on `word_choice.dialect_spelling`, which knows the
+word the project's dialect uses and writes it in the case the text spelled it
+in. Every other rule reports what it found and leaves the rewrite to you, so
+the field is absent rather than null.

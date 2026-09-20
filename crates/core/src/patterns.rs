@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::detector::dialect::Dialect;
 use crate::errors::{PatternLoadError, PatternValidationError};
 
 /// File names a project dictionary is discovered under, in search order.
@@ -121,6 +122,13 @@ pub struct PatternFile {
     /// case-insensitively.
     #[serde(default)]
     pub allow: Vec<String>,
+    /// The English dialect the project writes in, where it names one.
+    ///
+    /// Naming one turns on `word_choice.dialect_spelling`, which reports
+    /// every spelling the other dialect uses. The rule is off while this is
+    /// unset; [`crate::detector::dialect`] says why it has no default.
+    #[serde(default)]
+    pub dialect: Option<Dialect>,
     /// Globs naming paths no scan reads, relative to the directory holding
     /// this file. See [`crate::excludes::Excludes`].
     #[serde(default)]
@@ -704,6 +712,17 @@ phrases = ["bounded"]
                 .iter()
                 .any(|pattern| pattern.id == "word_choice.delve")
         );
+    }
+
+    #[test]
+    fn a_dictionary_names_the_dialect_the_project_writes_in() {
+        assert_eq!(
+            PatternFile::from_toml(r#"dialect = "british""#)
+                .unwrap()
+                .dialect,
+            Some(Dialect::British)
+        );
+        assert_eq!(PatternFile::default().dialect, None);
     }
 
     #[test]

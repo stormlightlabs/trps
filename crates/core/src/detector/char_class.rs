@@ -63,6 +63,7 @@ pub fn scan_unicode_decoration(text: &str) -> Vec<Finding> {
                     .map(|(_, character)| character.to_string())
                     .collect::<Vec<_>>()
                     .join(" "),
+                expected: None,
                 span: Span(first, last + character.len_utf8()),
             });
         }
