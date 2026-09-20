@@ -66,7 +66,7 @@ impl Detector {
         findings.extend(markdown::scan_markdown(text));
         findings.extend(structural::scan_structural(text));
         findings.extend(repetition::scan_repetition(text));
-        findings.retain(|finding| !suppressions.covers(finding.span.start()));
+        findings.retain(|finding| !suppressions.covers(finding.span.start(), &finding.rule_id));
         findings.sort_by_key(|finding| finding.span.start());
         findings
     }
@@ -416,6 +416,24 @@ mod tests {
             LineIndex::new(text).locate(delve[0].span.start()).line,
             3,
             "only the marked line is suppressed"
+        );
+    }
+
+    #[test]
+    fn a_marker_naming_a_rule_leaves_the_other_findings_alone() {
+        let detector = Detector::bundled().unwrap();
+        let text = "trps-ignore-next-line word_choice.delve\nLet us delve into a → world.\n";
+        let findings = detector.scan(text);
+
+        assert!(
+            !findings
+                .iter()
+                .any(|finding| finding.rule_id == "word_choice.delve")
+        );
+        assert!(
+            findings
+                .iter()
+                .any(|finding| finding.rule_id == char_class::UNICODE_DECORATION_RULE_ID)
         );
     }
 

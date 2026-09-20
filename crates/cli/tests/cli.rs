@@ -478,6 +478,27 @@ fn a_marked_region_is_kept_out_of_the_report() {
     assert_eq!(stdout(&output).matches("word_choice.delve").count(), 1);
 }
 
+#[test]
+fn a_marker_naming_a_rule_keeps_the_other_findings() {
+    let output = scan(
+        None,
+        "<!-- trps-ignore-next-line word_choice.delve -->\nLet us delve into a → world.\n",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        !stdout(&output).contains("word_choice.delve"),
+        "{}",
+        stdout(&output)
+    );
+    assert!(
+        stdout(&output).contains("unicode_decoration"),
+        "{}",
+        stdout(&output)
+    );
+}
+
 fn example(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../meta/examples")

@@ -190,6 +190,21 @@ including the two marker lines:
 <!-- trps-ignore-end -->
 ```
 
+Name rule ids after a marker to suppress those alone, separated by spaces or
+commas. A marker naming none suppresses every rule on the span:
+
+```markdown
+<!-- trps-ignore-next-line word_choice.delve -->
+Let us delve into the em dash — which still reports.
+```
+
+A `--` ends the list, so the note saying why the span was kept can sit beside
+the marker:
+
+```text
+trps-ignore-start -- transcribed from the 2019 proposal, quoted verbatim
+```
+
 A marker counts anywhere on a line, so every comment syntax carries one and a
 plain text file can write the bare word. A region left open runs to the end of
 the file.
