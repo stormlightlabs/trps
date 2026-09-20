@@ -11,7 +11,10 @@ use clap::Parser;
 use owo_colors::{OwoColorize, Stream};
 use serde::Serialize;
 use trps_core::{
-    detector::{Detector, Finding, LineIndex, Location},
+    detector::{
+        Detector, Finding, FindingKind, LineIndex, Location,
+        cross_file::{CrossFileFinding, CrossFileLimits, scan_cross_file},
+    },
     excludes::Excludes,
     patterns::{
         Severity, apply_dictionary, bundled_patterns, find_project_dictionary, load_pattern_file,
@@ -48,6 +51,7 @@ struct Args {
 struct Rules {
     detector: Detector,
     excludes: Excludes,
+    cross_file: CrossFileLimits,
     dictionary: Option<PathBuf>,
 }
 
@@ -63,6 +67,29 @@ struct Report<'a> {
     version: u32,
     dictionary: Option<String>,
     findings: Vec<ReportFinding<'a>>,
+    /// Runs shared by several of the scanned files. Absent when a run found
+    /// none, which is every run over a single path.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cross_file: Vec<SharedFinding<'a>>,
+}
+
+/// A run several files share, located once per place it appears.
+#[derive(Serialize)]
+struct SharedFinding<'a> {
+    rule_id: &'a str,
+    rule_name: &'a str,
+    severity: Severity,
+    kind: String,
+    matched: &'a str,
+    occurrences: Vec<SharedPlace<'a>>,
+}
+
+/// One place a shared run appears.
+#[derive(Serialize)]
+struct SharedPlace<'a> {
+    path: &'a str,
+    line: usize,
+    column: usize,
 }
 
 /// A finding located by path, line, and column rather than byte offset.
@@ -113,14 +140,21 @@ fn run(args: Args) -> Result<bool, String> {
         })
         .collect();
 
+    let texts: Vec<&str> = scanned
+        .iter()
+        .map(|(source, _)| source.text.as_str())
+        .collect();
+    let shared = scan_cross_file(&texts, rules.cross_file);
+
     warn_unknown_rules(&scanned, &rules.detector);
 
     match args.json {
-        true => print_json(&scanned, rules.dictionary)?,
-        false => print_report(&scanned),
+        true => print_json(&scanned, &shared, rules.dictionary)?,
+        false => print_report(&scanned, &shared),
     }
 
-    let has_findings = scanned.iter().any(|(_, findings)| !findings.is_empty());
+    let has_findings =
+        !shared.is_empty() || scanned.iter().any(|(_, findings)| !findings.is_empty());
 
     if !has_findings && !args.quiet {
         report_clean();
@@ -156,12 +190,14 @@ fn build_rules(dictionary: Option<PathBuf>) -> Result<Rules, String> {
     });
 
     let mut dialect = None;
+    let mut cross_file = CrossFileLimits::default();
 
     if let Some(path) = &dictionary {
         let file = load_pattern_file(path).map_err(|error| error.to_string())?;
         let root = path.parent().unwrap_or(Path::new("."));
 
         excludes = Excludes::new(root, &file.exclude).map_err(|error| error.to_string())?;
+        cross_file = file.cross_file;
         dialect = file.dialect;
         patterns = apply_dictionary(patterns, &file);
     }
@@ -177,6 +213,7 @@ fn build_rules(dictionary: Option<PathBuf>) -> Result<Rules, String> {
     Ok(Rules {
         detector,
         excludes,
+        cross_file,
         dictionary,
     })
 }
@@ -218,15 +255,15 @@ fn read_stdin() -> Result<String, String> {
     Ok(input)
 }
 
-fn print_json(
-    scanned: &[(Source, Vec<Finding>)],
+fn print_json<'a>(
+    scanned: &'a [(Source, Vec<Finding>)],
+    shared: &'a [CrossFileFinding],
     dictionary: Option<PathBuf>,
 ) -> Result<(), String> {
+    let indexes = line_indexes(scanned);
     let mut findings = Vec::new();
 
-    for (source, source_findings) in scanned {
-        let index = LineIndex::new(&source.text);
-
+    for ((source, source_findings), index) in scanned.iter().zip(&indexes) {
         findings.extend(source_findings.iter().map(|finding| {
             let location = index.locate(finding.span.start());
 
@@ -248,6 +285,29 @@ fn print_json(
         version: REPORT_VERSION,
         dictionary: dictionary.map(|path| path.display().to_string()),
         findings,
+        cross_file: shared
+            .iter()
+            .map(|finding| SharedFinding {
+                rule_id: &finding.rule_id,
+                rule_name: &finding.rule_name,
+                severity: finding.severity,
+                kind: FindingKind::Repetition.label(),
+                matched: &finding.matched,
+                occurrences: finding
+                    .occurrences
+                    .iter()
+                    .map(|occurrence| {
+                        let location = indexes[occurrence.document].locate(occurrence.span.start());
+
+                        SharedPlace {
+                            path: &scanned[occurrence.document].0.name,
+                            line: location.line,
+                            column: location.column,
+                        }
+                    })
+                    .collect(),
+            })
+            .collect(),
     };
 
     let json = serde_json::to_string_pretty(&report)
@@ -280,31 +340,76 @@ fn warn_unknown_rules(scanned: &[(Source, Vec<Finding>)], detector: &Detector) {
 
 /// Prints the decorated report. Every finding names its own place, so a run
 /// over several paths needs no heading to say which file it is reading.
-fn print_report(scanned: &[(Source, Vec<Finding>)]) {
-    for (source, findings) in scanned {
-        let index = LineIndex::new(&source.text);
+///
+/// What several files share comes last, after each file has been read on its
+/// own terms.
+fn print_report(scanned: &[(Source, Vec<Finding>)], shared: &[CrossFileFinding]) {
+    let indexes = line_indexes(scanned);
 
+    for ((source, findings), index) in scanned.iter().zip(&indexes) {
         for finding in findings {
-            print_finding(finding, &source.name, &index);
+            print_finding(finding, &source.name, index);
         }
+    }
+
+    for finding in shared {
+        print_shared_finding(finding, scanned, &indexes);
     }
 }
 
-fn print_finding(finding: &Finding, name: &str, index: &LineIndex) {
+/// One line index per scanned source, built once for every pass that reads
+/// them.
+fn line_indexes(scanned: &[(Source, Vec<Finding>)]) -> Vec<LineIndex<'_>> {
+    scanned
+        .iter()
+        .map(|(source, _)| LineIndex::new(&source.text))
+        .collect()
+}
+
+/// Prints a run several files share, naming every place it appears so a
+/// reader can tell a convention from a tic.
+fn print_shared_finding(
+    finding: &CrossFileFinding,
+    scanned: &[(Source, Vec<Finding>)],
+    indexes: &[LineIndex],
+) {
+    print_heading(finding.severity, &finding.rule_id);
+
+    for occurrence in &finding.occurrences {
+        println!(
+            "  ├─ {} {}",
+            FindingKind::Repetition.label(),
+            origin(
+                &scanned[occurrence.document].0.name,
+                indexes[occurrence.document].locate_span(occurrence.span),
+            ),
+        );
+    }
+
     println!(
-        "{} {} {}",
-        finding.severity.symbol(),
-        severity_label(finding.severity),
-        finding
-            .rule_id
-            .if_supports_color(Stream::Stdout, |text| text.bold()),
+        "  └─ {}",
+        indented_match(&finding.matched).if_supports_color(Stream::Stdout, |text| text.yellow())
     );
+}
+
+fn print_finding(finding: &Finding, name: &str, index: &LineIndex) {
+    print_heading(finding.severity, &finding.rule_id);
     println!(
         "  ├─ {} {}",
         finding.kind.label(),
         origin(name, index.locate_span(finding.span)),
     );
     println!("  └─ {}", matched_text(finding));
+}
+
+/// Prints the first line of a finding: its severity and the rule that fired.
+fn print_heading(severity: Severity, rule_id: &str) {
+    println!(
+        "{} {} {}",
+        severity.symbol(),
+        severity_label(severity),
+        rule_id.if_supports_color(Stream::Stdout, |text| text.bold()),
+    );
 }
 
 /// Renders what a finding matched, and the form it expected where the rule

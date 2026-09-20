@@ -46,3 +46,30 @@ named it on the command line, and `-` for text read from stdin. `line` and
 word the project's dialect uses and writes it in the case the text spelled it
 in. Every other rule reports what it found and leaves the rewrite to you, so
 the field is absent rather than null.
+
+## Findings that cross files
+
+`cross_file` carries what several of the scanned files share. A run is one
+entry however many files it appears in, and `occurrences` names each place:
+
+```json
+{
+  "cross_file": [
+    {
+      "rule_id": "composition.cross_file_duplication",
+      "rule_name": "Cross-File Duplication",
+      "severity": "medium",
+      "kind": "repeat",
+      "matched": "rather than left to be discovered",
+      "occurrences": [
+        { "path": "docs/one.md", "line": 12, "column": 22 },
+        { "path": "docs/two.md", "line": 40, "column": 28 }
+      ]
+    }
+  ]
+}
+```
+
+`matched` is the run as the first file writes it; the others differ from it
+only in case and punctuation. The key is absent when a run found nothing to
+report, which is every run over a single path.

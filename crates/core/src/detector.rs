@@ -1,6 +1,7 @@
 //! Text detectors for phrase-based and structural trope signals.
 
 pub mod char_class;
+pub mod cross_file;
 pub mod dialect;
 pub mod markdown;
 pub mod repetition;
@@ -23,6 +24,7 @@ use crate::suppression::Suppressions;
 /// rule id exists needs both, which [`Detector::rule_ids`] joins.
 pub const BUILTIN_RULE_IDS: &[&str] = &[
     char_class::UNICODE_DECORATION_RULE_ID,
+    cross_file::CROSS_FILE_DUPLICATION.0,
     dialect::DIALECT_SPELLING.0,
     markdown::BOLD_FIRST_LEADS.0,
     repetition::CONTENT_DUPLICATION.0,
@@ -370,6 +372,29 @@ fn prose_blocks(text: &str) -> Vec<Span> {
 /// Whether a line opens with enough whitespace to hang off the line above it.
 fn is_indented(line: &str) -> bool {
     line.len() - line.trim_start().len() >= 2
+}
+
+/// The words of `text`: runs of alphanumerics and apostrophes.
+///
+/// Three detectors count words, so the split lives here and each of them
+/// calls it.
+pub(crate) fn word_spans(text: &str) -> Vec<Span> {
+    let mut spans = Vec::new();
+    let mut start = None;
+
+    for (index, character) in text.char_indices() {
+        if character.is_ascii_alphanumeric() || character == '\'' {
+            start.get_or_insert(index);
+        } else if let Some(word_start) = start.take() {
+            spans.push(Span(word_start, index));
+        }
+    }
+
+    if let Some(word_start) = start {
+        spans.push(Span(word_start, text.len()));
+    }
+
+    spans
 }
 
 /// Pushes `start..end` with surrounding whitespace trimmed off, dropping a

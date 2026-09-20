@@ -53,6 +53,29 @@ A sentence ends at a `.`, `!`, or `?` with whitespace or the end of the file
 after it. A terminator inside a token does not end one, so `src/lib.rs` and
 `v0.1.1` are read as single words.
 
+## What several paths share
+
+A run over more than one path also compares the files against each other and
+reports the word runs they share. A phrase used once reads as voice, and the
+same phrase closing three neighboring documents is a tic neither file can see
+from the inside.
+
+Such a finding names every place the run appears, because whether a repetition
+is a house convention or a tic is yours to decide:
+
+```
+⚠ medium composition.cross_file_duplication
+  ├─ repeat docs/one.md:12:22-54
+  ├─ repeat docs/two.md:40:28-60
+  └─ rather than left to be discovered
+```
+
+Case and punctuation do not count against a match, and a link counts as one
+word however long it is. The rule is quiet on short runs, so shared vocabulary
+stays out of the report. [Tuning what repeats across
+files](/reference/project-dictionary/) has the two thresholds and when to raise
+them.
+
 ## A clean run
 
 A run that matches nothing says so on stderr:
