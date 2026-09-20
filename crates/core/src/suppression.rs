@@ -31,8 +31,21 @@ struct Region {
 impl Region {
     fn covers(&self, offset: usize, rule_id: &str) -> bool {
         self.span.contains(&offset)
-            && (self.rules.is_empty() || self.rules.iter().any(|rule| rule == rule_id))
+            && (self.rules.is_empty() || self.rules.iter().any(|rule| names(rule, rule_id)))
     }
+}
+
+/// Reports whether `rule` names `rule_id`, as the id itself or as one of the
+/// dotted namespaces above it.
+///
+/// A rule id is a dotted path, so `word_choice` reaching every rule under it
+/// saves a marker from listing them. The prefix has to end at a `.`, which is
+/// what keeps `word` from naming `word_choice.delve`.
+fn names(rule: &str, rule_id: &str) -> bool {
+    rule_id == rule
+        || rule_id
+            .strip_prefix(rule)
+            .is_some_and(|rest| rest.starts_with('.'))
 }
 
 /// Spans of scanned text a document has asked to keep.
@@ -42,9 +55,10 @@ impl Region {
 /// a bare word does in a plain text file.
 ///
 /// What follows a marker on its line is a list of rule ids, separated by
-/// spaces or commas, and a marker naming none suppresses every rule. A `--`
-/// ends the list, so the note saying why the span was kept can sit beside the
-/// marker without being read as a rule id.
+/// spaces or commas, and a marker naming none suppresses every rule. An id
+/// names the rule it spells or, as a dotted prefix, every rule beneath it. A
+/// `--` ends the list, so the note saying why the span was kept can sit beside
+/// the marker without being read as a rule id.
 #[derive(Debug, Default)]
 pub struct Suppressions {
     regions: Vec<Region>,
@@ -237,6 +251,25 @@ mod tests {
 
         assert!(suppressions.covers(one, "word_choice.delve"));
         assert!(!suppressions.covers(one, OTHER));
+    }
+
+    #[test]
+    fn a_namespace_names_every_rule_beneath_it() {
+        let text = "trps-ignore-next-line word_choice\none\n";
+        let suppressions = Suppressions::new(text);
+        let one = text.find("one").unwrap();
+
+        assert!(suppressions.covers(one, "word_choice.delve"));
+        assert!(suppressions.covers(one, "word_choice.magic_adverbs"));
+        assert!(!suppressions.covers(one, OTHER));
+    }
+
+    #[test]
+    fn a_prefix_stopping_inside_a_segment_names_nothing() {
+        let text = "trps-ignore-next-line word\none\n";
+        let suppressions = Suppressions::new(text);
+
+        assert!(!suppressions.covers(text.find("one").unwrap(), "word_choice.delve"));
     }
 
     #[test]

@@ -198,6 +198,10 @@ commas. A marker naming none suppresses every rule on the span:
 Let us delve into the em dash — which still reports.
 ```
 
+An id names the rule it spells, or every rule beneath it when it stops at a
+dot: `word_choice` covers `word_choice.delve` and `word_choice.magic_adverbs`,
+and `word` covers neither.
+
 A `--` ends the list, so the note saying why the span was kept can sit beside
 the marker:
 
