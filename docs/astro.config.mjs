@@ -2,17 +2,23 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import linksValidator from "starlight-links-validator";
+import llmsTxt from "starlight-llms-txt";
 
-// `site` stays unset until the documentation has a hostname. starlight-llms-txt
-// refuses to run without one, so it joins the config alongside the domain.
 export default defineConfig({
+  site: "https://trps.stormlightlabs.org",
   integrations: [
     starlight({
-      plugins: [linksValidator()],
+      plugins: [linksValidator(), llmsTxt()],
       title: "tropius",
       description: "A CLI that detects AI tropes in prose.",
       social: [
         { icon: "github", label: "GitHub", href: "https://github.com/stormlightlabs/trps" },
+      ],
+      customCss: [
+        "@fontsource-variable/google-sans",
+        "@fontsource-variable/inter",
+        "@fontsource-variable/google-sans-code",
+        "./src/styles/theme.css",
       ],
       sidebar: [{ label: "Documentation", items: [{ autogenerate: { directory: "." } }] }],
     }),

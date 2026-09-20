@@ -1,0 +1,79 @@
+/*
+ * Starlight builds its surface from the gray ramp and three accent steps, so
+ * redefining those covers most of the theme. tropius takes the green and gold
+ * that stormbuffer uses, on the warm paper that comes with it.
+ *
+ * Dark is the default. Light is defined under the attribute Starlight stamps
+ * on the root element when a reader picks it.
+ */
+
+:root {
+  --sl-font: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --sl-font-mono: "Google Sans Code Variable", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  /* Display face, used for headings and the site title only. */
+  --trps-font-display: "Google Sans Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* Gold, the second accent. Starlight has no token for it. */
+  --trps-gold: #f0bd46;
+
+  /* Teal, held at one hue so the accent never drifts between steps. */
+  --sl-color-accent-low: #0c3a32;
+  --sl-color-accent: #61c4ad;
+  --sl-color-accent-high: #8bd8c5;
+
+  /* Near-black through to near-white, warmed toward the green. */
+  --sl-color-white: #eef6f2;
+  --sl-color-gray-1: #e8f1ec;
+  --sl-color-gray-2: #c2d4cc;
+  --sl-color-gray-3: #a7bab2;
+  --sl-color-gray-4: #6e857d;
+  --sl-color-gray-5: #3d564e;
+  --sl-color-gray-6: #1f3a33;
+  --sl-color-gray-7: #17302a;
+  --sl-color-black: #0b1815;
+
+  --sl-color-bg: #10211d;
+  --sl-color-bg-nav: #0d1b18;
+  --sl-color-bg-sidebar: #0d1b18;
+  --sl-color-bg-inline-code: var(--sl-color-gray-6);
+  --sl-color-hairline: var(--sl-color-gray-6);
+  --sl-color-hairline-shade: var(--sl-color-gray-7);
+}
+
+:root[data-theme="light"] {
+  --trps-gold: #9a6500;
+
+  --sl-color-accent-low: #cfe6e0;
+  --sl-color-accent: #0b6b5e;
+  --sl-color-accent-high: #075044;
+
+  --sl-color-white: #17332d;
+  --sl-color-gray-1: #1c3b34;
+  --sl-color-gray-2: #2c4a43;
+  --sl-color-gray-3: #5f706a;
+  --sl-color-gray-4: #8a9a94;
+  --sl-color-gray-5: #c3cec9;
+  --sl-color-gray-6: #e3e6de;
+  --sl-color-gray-7: #eceee7;
+  --sl-color-black: #fffdf8;
+
+  --sl-color-bg: #f7f5ef;
+  --sl-color-bg-nav: #fffdf8;
+  --sl-color-bg-sidebar: #eceee7;
+  --sl-color-bg-inline-code: var(--sl-color-gray-6);
+  --sl-color-hairline: var(--sl-color-gray-5);
+  --sl-color-hairline-shade: var(--sl-color-gray-6);
+}
+
+/* Display face for headings and the site title; Inter carries body text. */
+:where(h1, h2, h3, h4, h5, h6),
+.site-title {
+  font-family: var(--trps-font-display);
+  letter-spacing: -0.016em;
+}
+
+/* Gold reaches the page through inline code, which every page has. Fenced
+   blocks are syntax-highlighted and keep their own colours. */
+:not(pre) > code {
+  color: var(--trps-gold);
+}
