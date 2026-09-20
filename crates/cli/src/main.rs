@@ -3,7 +3,7 @@
 use std::fs;
 use std::{
     io::{self, Read},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::ExitCode,
 };
 
@@ -13,13 +13,12 @@ use serde::Serialize;
 use trps_core::{
     detector::{
         Detector, Finding, FindingKind, LineIndex, Location,
-        cross_file::{CrossFileFinding, CrossFileLimits, scan_cross_file},
+        cross_file::{CrossFileFinding, scan_cross_file},
         group_by_span,
     },
     excludes::Excludes,
-    patterns::{
-        Severity, apply_dictionary, bundled_patterns, find_project_dictionary, load_pattern_file,
-    },
+    patterns::Severity,
+    rules::Rules,
     suppression::Suppressions,
 };
 
@@ -45,15 +44,6 @@ struct Args {
     /// Do not print the line a clean run writes to stderr.
     #[arg(short, long)]
     quiet: bool,
-}
-
-/// What a run's project dictionary decides. The file itself is kept so the
-/// JSON report can name it.
-struct Rules {
-    detector: Detector,
-    excludes: Excludes,
-    cross_file: CrossFileLimits,
-    dictionary: Option<PathBuf>,
 }
 
 /// Text to scan, under the name the report gives it.
@@ -130,7 +120,12 @@ fn main() -> ExitCode {
 }
 
 fn run(args: Args) -> Result<bool, String> {
-    let rules = build_rules(args.dictionary)?;
+    // A working directory that cannot be read is no directory to search from,
+    // so the run applies the bundled patterns rather than whatever a relative
+    // search would turn up.
+    let from = std::env::current_dir().ok();
+    let rules = Rules::resolve(args.dictionary.as_deref(), from.as_deref())
+        .map_err(|error| error.to_string())?;
     let sources = read_sources(args.inputs, &rules.excludes)?;
 
     let scanned: Vec<(Source, Vec<Finding>)> = sources
@@ -177,46 +172,6 @@ fn report_clean() {
 and editorial asides are not in it.",
         "clean:".if_supports_color(Stream::Stderr, |text| text.green()),
     );
-}
-
-/// Resolves the one dictionary a run applies to every path.
-fn build_rules(dictionary: Option<PathBuf>) -> Result<Rules, String> {
-    let mut patterns = bundled_patterns().map_err(|error| error.to_string())?;
-    let mut excludes = Excludes::default();
-
-    let dictionary = dictionary.or_else(|| {
-        std::env::current_dir()
-            .ok()
-            .and_then(|directory| find_project_dictionary(&directory))
-    });
-
-    let mut dialect = None;
-    let mut cross_file = CrossFileLimits::default();
-
-    if let Some(path) = &dictionary {
-        let file = load_pattern_file(path).map_err(|error| error.to_string())?;
-        let root = path.parent().unwrap_or(Path::new("."));
-
-        excludes = Excludes::new(root, &file.exclude).map_err(|error| error.to_string())?;
-        cross_file = file.cross_file;
-        dialect = file.dialect;
-        patterns = apply_dictionary(patterns, &file);
-    }
-
-    let mut detector = Detector::new(patterns).map_err(|error| error.to_string())?;
-
-    if let Some(dialect) = dialect {
-        detector = detector
-            .with_dialect(dialect)
-            .map_err(|error| error.to_string())?;
-    }
-
-    Ok(Rules {
-        detector,
-        excludes,
-        cross_file,
-        dictionary,
-    })
 }
 
 /// Reads every path up front so an unreadable one fails before any report is

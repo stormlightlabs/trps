@@ -1,4 +1,4 @@
-//! Filesystem tests for project dictionary discovery.
+//! Filesystem tests for project dictionary discovery and rule resolution.
 //!
 //! These build directory trees, so they run under the test target directory
 //! rather than a shared temporary one.
@@ -8,6 +8,10 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use trps_core::patterns::{PROJECT_DICTIONARY_FILES, find_project_dictionary, load_pattern_file};
+use trps_core::rules::Rules;
+
+/// Prose carrying a bundled phrase, which a dictionary can allow away.
+const DELVE: &str = "Let us delve into this.\n";
 
 #[test]
 fn a_dictionary_is_found_in_an_ancestor_directory() {
@@ -75,6 +79,86 @@ fn reading_a_missing_dictionary_reports_its_path() {
     let error = load_pattern_file(&path).unwrap_err();
 
     assert!(error.to_string().contains("trps.toml"));
+}
+
+#[test]
+fn a_named_dictionary_is_resolved_over_one_the_search_would_find() {
+    let root = repository("resolve-named-dictionary");
+    let named = root.join("named.toml");
+    fs::write(&named, "allow = [\"delve into\"]\n").unwrap();
+    fs::write(root.join(PROJECT_DICTIONARY_FILES[0]), "allow = []\n").unwrap();
+
+    let rules = Rules::resolve(Some(&named), Some(&root)).unwrap();
+
+    assert_eq!(rules.dictionary, Some(named));
+    assert!(!reports_delve(&rules));
+}
+
+#[test]
+fn a_dictionary_the_search_finds_is_resolved_without_being_named() {
+    let root = repository("resolve-discovered-dictionary");
+    let nested = root.join("docs");
+    fs::create_dir_all(&nested).unwrap();
+    fs::write(
+        root.join(PROJECT_DICTIONARY_FILES[0]),
+        "allow = [\"delve into\"]\n",
+    )
+    .unwrap();
+
+    let rules = Rules::resolve(None, Some(&nested)).unwrap();
+
+    assert_eq!(
+        rules.dictionary,
+        Some(root.join(PROJECT_DICTIONARY_FILES[0]))
+    );
+    assert!(!reports_delve(&rules));
+}
+
+#[test]
+fn without_a_dictionary_the_bundled_patterns_stand_alone() {
+    let root = repository("resolve-no-dictionary");
+
+    let rules = Rules::resolve(None, Some(&root)).unwrap();
+
+    assert_eq!(rules.dictionary, None);
+    assert!(reports_delve(&rules));
+    assert!(!rules.excludes.excludes(&root.join("notebook/page.md")));
+}
+
+#[test]
+fn excludes_are_resolved_against_the_dictionary_directory() {
+    let project = repository("resolve-exclude-root");
+    let dictionary = project.join(PROJECT_DICTIONARY_FILES[0]);
+    fs::write(&dictionary, "exclude = [\"notebook/\"]\n").unwrap();
+    let elsewhere = repository("resolve-exclude-caller");
+
+    let rules = Rules::resolve(Some(&dictionary), Some(&elsewhere)).unwrap();
+
+    assert!(rules.excludes.excludes(&project.join("notebook/page.md")));
+    assert!(!rules.excludes.excludes(&elsewhere.join("notebook/page.md")));
+}
+
+#[test]
+fn an_exclude_that_is_not_a_glob_fails_the_resolution() {
+    let root = repository("resolve-bad-exclude");
+    fs::write(
+        root.join(PROJECT_DICTIONARY_FILES[0]),
+        "exclude = [\"notebook/[\"]\n",
+    )
+    .unwrap();
+
+    let error = Rules::resolve(None, Some(&root)).unwrap_err();
+
+    assert!(error.to_string().contains("notebook/["), "{error}");
+}
+
+/// Whether the resolved detector still reports the bundled phrase in [`DELVE`].
+fn reports_delve(rules: &Rules) -> bool {
+    rules
+        .detector
+        .scan(DELVE)
+        .iter()
+        .any(|finding| finding.rule_id == "word_choice.delve")
 }
 
 /// An empty directory under the test target directory, one per case.
