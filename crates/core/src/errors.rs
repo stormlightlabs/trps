@@ -1,4 +1,5 @@
-//! Error types returned by core pattern loading and detector construction.
+//! Error types returned by core rule resolution, pattern loading, and
+//! detector construction.
 
 use thiserror::Error;
 
@@ -94,4 +95,18 @@ pub enum PatternValidationError {
         /// The duplicate phrase as it appeared in the later entry.
         phrase: String,
     },
+}
+
+/// Errors that can happen while resolving the rules a run applies.
+#[derive(Debug, Error)]
+pub enum RulesError {
+    /// A dictionary could not be read, parsed, or validated.
+    #[error(transparent)]
+    PatternLoad(#[from] PatternLoadError),
+    /// A dictionary's path excludes could not be compiled.
+    #[error(transparent)]
+    Exclude(#[from] ExcludeError),
+    /// The detector could not be built from the resolved patterns.
+    #[error(transparent)]
+    Detector(#[from] DetectorBuildError),
 }
