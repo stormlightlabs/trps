@@ -1,5 +1,5 @@
 [package]
-name = "tropius-cli"
+name = "trps-cli"
 description = "A CLI to detect AI tropes in prose"
 categories = ["command-line-utilities", "text-processing"]
 version.workspace = true
@@ -18,7 +18,7 @@ clap = { version = "4", features = ["derive"] }
 owo-colors = { version = "4", features = ["supports-colors"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tropius-core = { path = "../core", version = "0.1.0" }
+trps-core = { path = "../core", version = "0.1.0" }
 
 [dev-dependencies]
 serde_json = "1"

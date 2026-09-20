@@ -8,13 +8,13 @@ sidebar:
 Scan text from stdin:
 
 ```sh
-printf 'Let us delve into this robust ecosystem.' | cargo run -q -p tropius-cli
+printf 'Let us delve into this robust ecosystem.' | cargo run -q -p trps-cli
 ```
 
 Scan files, as many as you have:
 
 ```sh
-cargo run -q -p tropius-cli -- README.md docs/guide.md
+cargo run -q -p trps-cli -- README.md docs/guide.md
 ```
 
 Every finding is located as `path:line:column-column`, so a run over several
@@ -31,7 +31,7 @@ cargo install lectito-cli
 
 lectito 'https://www.solo.io/blog/what-is-agent-identity-human-workload-a-new-layer' \
     --format text \
-    | cargo run -q -p tropius-cli
+    | cargo run -q -p trps-cli
 ```
 
 ## Exit codes

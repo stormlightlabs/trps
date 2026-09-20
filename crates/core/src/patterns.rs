@@ -59,7 +59,7 @@ pub fn source(key: &str) -> Option<&'static Source> {
     SOURCES.iter().find(|source| source.key == key)
 }
 
-/// TOML files bundled into `tropius-core`.
+/// TOML files bundled into `trps-core`.
 pub const BUNDLED_PATTERN_FILES: &[(&str, &str)] = &[
     ("formatting.toml", include_str!("patterns/formatting.toml")),
     (

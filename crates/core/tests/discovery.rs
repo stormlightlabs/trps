@@ -7,9 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use tropius_core::patterns::{
-    PROJECT_DICTIONARY_FILES, find_project_dictionary, load_pattern_file,
-};
+use trps_core::patterns::{PROJECT_DICTIONARY_FILES, find_project_dictionary, load_pattern_file};
 
 #[test]
 fn a_dictionary_is_found_in_an_ancestor_directory() {

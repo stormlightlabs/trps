@@ -595,7 +595,7 @@ fn run(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("failed to run tropius-cli");
+        .expect("failed to run trps-cli");
 
     child
         .stdin

@@ -1,5 +1,5 @@
 [package]
-name = "tropius-core"
+name = "trps-core"
 description = "Pattern dictionary and detectors that find AI tropes in prose"
 categories = ["text-processing", "development-tools"]
 version.workspace = true

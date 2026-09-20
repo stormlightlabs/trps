@@ -10,7 +10,7 @@ use std::{
 use clap::Parser;
 use owo_colors::{OwoColorize, Stream};
 use serde::Serialize;
-use tropius_core::{
+use trps_core::{
     detector::{Detector, Finding, LineIndex, Location},
     excludes::Excludes,
     patterns::{
