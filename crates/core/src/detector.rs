@@ -235,12 +235,19 @@ impl<'a> LineIndex<'a> {
         }
     }
 
-    /// Resolves a span to the location of its start and of its end.
+    /// Resolves a span to the location of its first and last characters.
     ///
-    /// The end is the half-open end the span itself carries: it is the
-    /// column after the last matched character.
+    /// Both ends are inclusive, so the pair covers what a reader would
+    /// underline. A span matching nothing reports its start twice.
     pub fn locate_span(&self, span: Span) -> (Location, Location) {
-        (self.locate(span.start()), self.locate(span.end()))
+        let last = self.text[..span.end().min(self.text.len())]
+            .char_indices()
+            .next_back()
+            .map(|(offset, _)| offset)
+            .filter(|offset| *offset >= span.start())
+            .unwrap_or_else(|| span.start());
+
+        (self.locate(span.start()), self.locate(last))
     }
 }
 
@@ -328,24 +335,33 @@ mod tests {
     }
 
     #[test]
-    fn a_span_locates_both_of_its_ends() {
+    fn a_span_locates_its_first_and_last_characters() {
         let text = "one two\nthree four\n";
         let index = LineIndex::new(text);
 
+        assert_eq!(&text[4..7], "two");
         assert_eq!(
             index.locate_span(Span(4, 7)),
             (
                 Location { line: 1, column: 5 },
-                Location { line: 1, column: 8 }
+                Location { line: 1, column: 7 }
             )
         );
         assert_eq!(
             index.locate_span(Span(0, 13)),
             (
                 Location { line: 1, column: 1 },
-                Location { line: 2, column: 6 }
+                Location { line: 2, column: 5 }
             )
         );
+    }
+
+    #[test]
+    fn an_empty_span_locates_its_start_twice() {
+        let index = LineIndex::new("one two\n");
+        let start = Location { line: 1, column: 5 };
+
+        assert_eq!(index.locate_span(Span(4, 4)), (start, start));
     }
 
     #[test]

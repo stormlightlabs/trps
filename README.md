@@ -33,9 +33,8 @@ cargo run -q -p tropius-cli -- README.md docs/guide.md
 
 Every finding is located as `path:line:column-column`, so a run over several
 files needs no heading to say which one it is reading. Text from stdin has no
-path and reports the line and column alone. Columns are 1-based and count
-characters rather than bytes; the end column is one past the last character
-matched.
+path and reports the line and column alone. Columns are 1-based, count
+characters rather than bytes, and both ends are inclusive.
 
 Scan article text extracted from a live URL with
 [lectito](https://lectito.stormlightlabs.org/):
