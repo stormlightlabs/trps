@@ -89,7 +89,13 @@ pub const BUNDLED_PATTERN_FILES: &[(&str, &str)] = &[
 ];
 
 /// Severity attached to a pattern or detector finding.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+///
+/// The variants are ordered as a scale, `Low < Medium < High`, so a consumer
+/// can keep the findings it cares about with a comparison. That ordering is
+/// part of the API: the variants stay in this order.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, serde::Serialize,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     /// Low-confidence or low-impact signal.
@@ -386,6 +392,12 @@ phrases = ["delve into"]
         .unwrap_err();
 
         assert!(error.to_string().contains("unknown variant"));
+    }
+
+    #[test]
+    fn severity_orders_from_low_to_high() {
+        assert!(Severity::Low < Severity::Medium);
+        assert!(Severity::Medium < Severity::High);
     }
 
     #[test]
