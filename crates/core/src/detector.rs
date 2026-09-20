@@ -218,11 +218,11 @@ impl Span {
     }
 }
 
-/// The blank-line separated sections of the text, each trimmed of the
-/// whitespace around it.
+/// The blank-line separated sections of the text, each trimmed of surrounding
+/// whitespace.
 ///
-/// Several detectors threshold per section rather than per occurrence, so the
-/// split lives here rather than once in each of them.
+/// Three detectors count per section, so the split lives here and each of them
+/// calls it.
 pub(crate) fn paragraph_spans(text: &str) -> Vec<Span> {
     let mut spans = Vec::new();
     let mut start = 0;
@@ -236,8 +236,8 @@ pub(crate) fn paragraph_spans(text: &str) -> Vec<Span> {
     spans
 }
 
-/// Pushes `start..end` with the whitespace around it trimmed off, dropping a
-/// span that holds nothing else.
+/// Pushes `start..end` with surrounding whitespace trimmed off, dropping a
+/// span that holds only whitespace.
 pub(crate) fn push_trimmed_span(text: &str, spans: &mut Vec<Span>, start: usize, end: usize) {
     let value = &text[start..end];
 

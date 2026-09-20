@@ -9,24 +9,24 @@ pub const UNICODE_DECORATION_RULE_ID: &str = "formatting.unicode_decoration";
 
 const UNICODE_DECORATION_RULE_NAME: &str = "Unicode Decoration";
 
-/// Decorative characters, grouped so that a run of one kind is what fires.
+/// Decorative characters, grouped so that each class is counted on its own.
 ///
-/// A single em dash or one quoted phrase reads as a human voice. The tell is
-/// the same class used over and over in one section, which is why the classes
-/// are counted apart from each other rather than together.
+/// One em dash or one quoted phrase reads as ordinary prose, so a class fires
+/// only where it repeats inside a section. Counting every class together would
+/// report a paragraph carrying one dash, one arrow, and one quoted phrase.
 ///
-/// Curly single quotes are left out. `’` is how a word processor writes an
-/// apostrophe, and an apostrophe is not decoration.
+/// Curly single quotes are left out: `’` is how a word processor writes an
+/// apostrophe.
 const DECORATION_CLASSES: &[&[char]] = &[&['—', '–'], &['“', '”'], &['→', '←', '↔', '⇒']];
 
-/// Occurrences of one class within one section before it is worth reporting.
+/// Occurrences of one class inside one section before it is reported.
 const DECORATION_THRESHOLD: usize = 3;
 
-/// Finds Unicode punctuation and decorative symbols repeated within a section.
+/// Finds Unicode punctuation and decorative symbols repeated inside a section.
 ///
-/// One finding covers one class in one section, spanning the first occurrence
-/// to the last and matching the characters themselves, so a reader sees how
-/// many there were and where instead of one glyph per finding.
+/// One finding covers one class in one section. It spans the first occurrence
+/// to the last and matches the characters themselves, so it reports how many
+/// there were and where.
 pub fn scan_unicode_decoration(text: &str) -> Vec<Finding> {
     let mut findings = Vec::new();
 

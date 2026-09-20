@@ -263,7 +263,7 @@ Every bullet point or list item starts with a bolded phrase or sentence. Extreme
 
 ### Unicode Decoration
 
-Use of unicode arrows (->), smart/curly quotes, and other special characters that can't be easily typed on a standard keyboard. Real writers typing in a text editor produce straight quotes and -> or =>. Claude in particular loves the -> arrow. One of these is not the tell, so the detector reports a class of them repeated within one section rather than every glyph it finds. A curly apostrophe is what a word processor writes for an apostrophe, and does not count.
+Use of unicode arrows (->), smart/curly quotes, and other special characters that can't be easily typed on a standard keyboard. Real writers typing in a text editor produce straight quotes and -> or =>. Claude in particular loves the -> arrow.
 
 **Avoid patterns like:**
 
