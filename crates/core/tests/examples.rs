@@ -3,6 +3,10 @@
 //! A file in `clean/` must produce no findings. A file in `slop/` must produce
 //! exactly the rule ids listed for it below, so a detector that starts or stops
 //! firing on real prose shows up as a failing test rather than as drift.
+//!
+//! `rules.rs` holds one sample per pattern and fails when a pattern arrives
+//! with no test at all. These fixtures are prose where several rules meet, and
+//! fail when one of them changes what it reports beside the others.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -12,6 +16,17 @@ use tropius_core::detector::Detector;
 
 /// Rule ids each slop example is expected to produce.
 const SLOP_RULES: &[(&str, &[&str])] = &[
+    (
+        "assistant-voice.txt",
+        &[
+            "assistant.chat_residue",
+            "assistant.cutoff_disclaimer",
+            "assistant.process_narration",
+            "assistant.self_reference",
+            "assistant.tool_residue",
+            "assistant.unfilled_placeholder",
+        ],
+    ),
     (
         "composition.txt",
         &[
@@ -28,6 +43,29 @@ const SLOP_RULES: &[(&str, &[&str])] = &[
             "formatting.em_dash_addiction",
             "formatting.signposted_conclusion",
             "formatting.unicode_decoration",
+        ],
+    ),
+    (
+        "hedging.txt",
+        &[
+            "composition.restatement_markers",
+            "composition.throat_clearing",
+            "sentence_structure.hedge_stack",
+            "sentence_structure.impersonal_hedge",
+        ],
+    ),
+    (
+        "narrative.txt",
+        &["narrative.body_beats", "narrative.stock_imagery"],
+    ),
+    (
+        "promotion.txt",
+        &[
+            "composition.era_framing",
+            "composition.vague_connection",
+            "tone.engagement_bait",
+            "tone.promotional",
+            "word_choice.lexical_spikes",
         ],
     ),
     (
@@ -58,6 +96,15 @@ const SLOP_RULES: &[(&str, &[&str])] = &[
             "paragraph_structure.short_punchy_fragments",
             "sentence_structure.anaphora_abuse",
             "sentence_structure.tricolon_abuse",
+        ],
+    ),
+    (
+        "technical-prose.md",
+        &[
+            "technical.anthropomorphism",
+            "technical.restates_code",
+            "technical.self_praise",
+            "technical.vague_reasons",
         ],
     ),
     (

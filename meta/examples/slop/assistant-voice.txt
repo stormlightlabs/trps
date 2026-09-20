@@ -1,0 +1,10 @@
+Great question. Let me check the release notes before I answer.
+
+I can see that the queue drains on restart. As of my last update, the wire
+format was stable, and I don't have access to real-time numbers for the new
+one.
+
+The spec is at https://example.com/spec?utm_source=chatgpt.com and the
+migration guide covers the fields we renamed.
+
+I hope this helps. Signed, [Your Name]
