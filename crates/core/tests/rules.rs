@@ -15,10 +15,6 @@ use trps_core::patterns::{SOURCES, bundled_patterns};
 /// rule the sample is listed under is asserted.
 const SAMPLES: &[(&str, &str)] = &[
     (
-        "formatting.em_dash_addiction",
-        "The change -- long overdue -- shipped on Friday.",
-    ),
-    (
         "formatting.signposted_conclusion",
         "In conclusion, the release shipped a week late.",
     ),

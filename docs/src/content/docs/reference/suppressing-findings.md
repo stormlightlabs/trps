@@ -33,7 +33,7 @@ commas. A marker naming none suppresses every rule on the span:
 
 ```markdown
 <!-- trps-ignore-next-line word_choice.delve -->
-Let us delve into the em dash — which still reports.
+Let us delve into this robust ecosystem, which still reports.
 ```
 
 An id names the rule it spells, or every rule beneath it when it stops at a

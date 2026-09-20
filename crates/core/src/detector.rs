@@ -23,6 +23,7 @@ use crate::suppression::Suppressions;
 /// those; these have no dictionary entry to read. Anything asking whether a
 /// rule id exists needs both, which [`Detector::rule_ids`] joins.
 pub const BUILTIN_RULE_IDS: &[&str] = &[
+    char_class::EM_DASH_ADDICTION.0,
     char_class::UNICODE_DECORATION_RULE_ID,
     cross_file::CROSS_FILE_DUPLICATION.0,
     dialect::DIALECT_SPELLING.0,
@@ -117,6 +118,7 @@ impl Detector {
         let suppressions = Suppressions::new(text);
         let mut findings = self.scan_phrases(text);
 
+        findings.extend(char_class::scan_em_dash_addiction(text));
         findings.extend(char_class::scan_unicode_decoration(text));
         findings.extend(markdown::scan_markdown(text));
         findings.extend(structural::scan_structural(text));
