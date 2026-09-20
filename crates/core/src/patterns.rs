@@ -18,8 +18,6 @@ pub const PROJECT_DICTIONARY_FILES: &[&str] = &["trps.toml", "tropes.toml", "tro
 pub struct Source {
     /// Key a pattern cites, such as `tropes.fyi`.
     pub key: &'static str,
-    /// What to call the catalog in prose.
-    pub title: &'static str,
     /// Where the catalog is published.
     pub url: &'static str,
 }
@@ -28,37 +26,30 @@ pub struct Source {
 pub const SOURCES: &[Source] = &[
     Source {
         key: "tropes.fyi",
-        title: "Tropes.fyi",
         url: "https://tropes.fyi",
     },
     Source {
         key: "humanizer",
-        title: "blader/humanizer",
         url: "https://github.com/blader/humanizer",
     },
     Source {
         key: "avoid-ai-writing",
-        title: "conorbronsdon/avoid-ai-writing",
         url: "https://github.com/conorbronsdon/avoid-ai-writing",
     },
     Source {
         key: "clearmode",
-        title: "eugeniughelbur/clearmode",
         url: "https://github.com/eugeniughelbur/clearmode",
     },
     Source {
         key: "vale-llm-slop",
-        title: "Syntaf/vale-llm-slop",
         url: "https://github.com/Syntaf/vale-llm-slop",
     },
     Source {
         key: "vale-ai-slop",
-        title: "stuffbucket/vale, research/ai-slop",
         url: "https://github.com/stuffbucket/vale/tree/main/research/ai-slop",
     },
     Source {
         key: "slop-forensics",
-        title: "sam-paech/slop-forensics",
         url: "https://github.com/sam-paech/slop-forensics",
     },
 ];
