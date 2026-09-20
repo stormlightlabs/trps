@@ -88,7 +88,7 @@ fn a_named_dictionary_is_resolved_over_one_the_search_would_find() {
     fs::write(&named, "allow = [\"delve into\"]\n").unwrap();
     fs::write(root.join(PROJECT_DICTIONARY_FILES[0]), "allow = []\n").unwrap();
 
-    let rules = Rules::resolve(Some(&named), &root).unwrap();
+    let rules = Rules::resolve(Some(&named), Some(&root)).unwrap();
 
     assert_eq!(rules.dictionary, Some(named));
     assert!(!reports_delve(&rules));
@@ -105,7 +105,7 @@ fn a_dictionary_the_search_finds_is_resolved_without_being_named() {
     )
     .unwrap();
 
-    let rules = Rules::resolve(None, &nested).unwrap();
+    let rules = Rules::resolve(None, Some(&nested)).unwrap();
 
     assert_eq!(
         rules.dictionary,
@@ -118,7 +118,7 @@ fn a_dictionary_the_search_finds_is_resolved_without_being_named() {
 fn without_a_dictionary_the_bundled_patterns_stand_alone() {
     let root = repository("resolve-no-dictionary");
 
-    let rules = Rules::resolve(None, &root).unwrap();
+    let rules = Rules::resolve(None, Some(&root)).unwrap();
 
     assert_eq!(rules.dictionary, None);
     assert!(reports_delve(&rules));
@@ -132,7 +132,7 @@ fn excludes_are_resolved_against_the_dictionary_directory() {
     fs::write(&dictionary, "exclude = [\"notebook/\"]\n").unwrap();
     let elsewhere = repository("resolve-exclude-caller");
 
-    let rules = Rules::resolve(Some(&dictionary), &elsewhere).unwrap();
+    let rules = Rules::resolve(Some(&dictionary), Some(&elsewhere)).unwrap();
 
     assert!(rules.excludes.excludes(&project.join("notebook/page.md")));
     assert!(!rules.excludes.excludes(&elsewhere.join("notebook/page.md")));
@@ -147,7 +147,7 @@ fn an_exclude_that_is_not_a_glob_fails_the_resolution() {
     )
     .unwrap();
 
-    let error = Rules::resolve(None, &root).unwrap_err();
+    let error = Rules::resolve(None, Some(&root)).unwrap_err();
 
     assert!(error.to_string().contains("notebook/["), "{error}");
 }

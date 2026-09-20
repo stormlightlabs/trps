@@ -36,13 +36,15 @@ impl Rules {
     /// `dictionary` names the file to apply. Where it is `None`, the nearest
     /// project dictionary at or above `from` applies, under the search
     /// [`find_project_dictionary`] describes; `from` is the directory the run
-    /// was started in. Where neither finds one, the bundled patterns stand
-    /// alone.
+    /// was started in, where the caller knows it. A caller that could not read
+    /// its working directory passes `None` and no search happens, rather than
+    /// one from a directory that is only a guess. Where neither finds a
+    /// dictionary, the bundled patterns stand alone.
     ///
     /// A dictionary's excludes are compiled against the directory holding it,
     /// not `from`, so its globs read the way a path in that repository does
     /// however the run was started.
-    pub fn resolve(dictionary: Option<&Path>, from: &Path) -> Result<Self, RulesError> {
+    pub fn resolve(dictionary: Option<&Path>, from: Option<&Path>) -> Result<Self, RulesError> {
         let mut patterns = bundled_patterns()?;
         let mut excludes = Excludes::default();
         let mut cross_file = CrossFileLimits::default();
@@ -50,7 +52,7 @@ impl Rules {
 
         let dictionary = dictionary
             .map(Path::to_path_buf)
-            .or_else(|| find_project_dictionary(from));
+            .or_else(|| from.and_then(find_project_dictionary));
 
         if let Some(path) = &dictionary {
             let file = load_pattern_file(path)?;

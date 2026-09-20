@@ -120,9 +120,12 @@ fn main() -> ExitCode {
 }
 
 fn run(args: Args) -> Result<bool, String> {
-    let from = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let rules =
-        Rules::resolve(args.dictionary.as_deref(), &from).map_err(|error| error.to_string())?;
+    // A working directory that cannot be read is no directory to search from,
+    // so the run applies the bundled patterns rather than whatever a relative
+    // search would turn up.
+    let from = std::env::current_dir().ok();
+    let rules = Rules::resolve(args.dictionary.as_deref(), from.as_deref())
+        .map_err(|error| error.to_string())?;
     let sources = read_sources(args.inputs, &rules.excludes)?;
 
     let scanned: Vec<(Source, Vec<Finding>)> = sources
