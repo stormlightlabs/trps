@@ -74,6 +74,9 @@ struct ReportFinding<'a> {
     line: usize,
     column: usize,
     matched: &'a str,
+    /// The spelling the project's dialect uses, on the one rule that knows.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    expected: Option<&'a str>,
 }
 
 fn main() -> ExitCode {
@@ -129,15 +132,24 @@ fn build_rules(dictionary: Option<PathBuf>) -> Result<Rules, String> {
             .and_then(|directory| find_project_dictionary(&directory))
     });
 
+    let mut dialect = None;
+
     if let Some(path) = &dictionary {
         let file = load_pattern_file(path).map_err(|error| error.to_string())?;
         let root = path.parent().unwrap_or(Path::new("."));
 
         excludes = Excludes::new(root, &file.exclude).map_err(|error| error.to_string())?;
+        dialect = file.dialect;
         patterns = apply_dictionary(patterns, &file);
     }
 
-    let detector = Detector::new(patterns).map_err(|error| error.to_string())?;
+    let mut detector = Detector::new(patterns).map_err(|error| error.to_string())?;
+
+    if let Some(dialect) = dialect {
+        detector = detector
+            .with_dialect(dialect)
+            .map_err(|error| error.to_string())?;
+    }
 
     Ok(Rules {
         detector,
@@ -204,6 +216,7 @@ fn print_json(
                 line: location.line,
                 column: location.column,
                 matched: &finding.matched,
+                expected: finding.expected.as_deref(),
             }
         }));
     }
@@ -268,10 +281,23 @@ fn print_finding(finding: &Finding, name: &str, index: &LineIndex) {
         finding.kind.label(),
         origin(name, index.locate_span(finding.span)),
     );
-    println!(
-        "  └─ {}",
-        indented_match(&finding.matched).if_supports_color(Stream::Stdout, |text| text.yellow())
-    );
+    println!("  └─ {}", matched_text(finding));
+}
+
+/// Renders what a finding matched, and the spelling it expected where the
+/// rule carries one, so a dialect fix needs no lookup.
+fn matched_text(finding: &Finding) -> String {
+    let matched = indented_match(&finding.matched)
+        .if_supports_color(Stream::Stdout, |text| text.yellow())
+        .to_string();
+
+    match &finding.expected {
+        Some(expected) => format!(
+            "{matched} → {}",
+            expected.if_supports_color(Stream::Stdout, |text| text.green())
+        ),
+        None => matched,
+    }
 }
 
 /// Renders where a finding is, as `path:line:column-column`, dropping the

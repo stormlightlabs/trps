@@ -67,6 +67,44 @@ Declared patterns are matched before the bundled ones, so a project phrase wins
 where the two overlap: a rule for `landscape architecture` reports that span
 rather than losing it to the bundled `landscape`.
 
+## Choosing a dialect
+
+A corpus drifts between `judgment` and `judgement` unless something holds it to
+one. `dialect` names the side the project writes on, and turns on
+`word_choice.dialect_spelling`:
+
+```toml
+dialect = "american"
+```
+
+`american` and `british` are the two values, and neither is the default. The
+rule stays off while the key is unset, because a tool that picked a dialect for
+you would report half of a British corpus as wrong.
+
+A finding names the spelling it found and the one the dialect uses, in the case
+you wrote it:
+
+```
+⚠ medium word_choice.dialect_spelling
+  ├─ spelling docs/guide.md:1:5-13
+  └─ judgement → judgment
+```
+
+The word list covers the `-or`/`-our`, `-ize`/`-ise`, `-er`/`-re` and
+`-se`/`-ce` families, the doubled consonants of `travelled` and `enrolment`,
+and the irregulars that follow no pattern. Nothing is stemmed: `colours` is
+reported because it is listed, and a word with no entry is not reported at all.
+
+A pair is listed only where both spellings are unambiguous, since the rule
+reads them in both directions. `program`, which British English also uses for
+software, and `license` and `practice`, which American English spells one way
+for both the noun and the verb, are left out rather than reported wrongly.
+British here means the `-ise` convention, not the `-ize` one Oxford keeps.
+
+Spelling inside a fenced block or front matter is never graded, and a single
+finding can be suppressed the way any other is. [Suppressing
+findings](/reference/suppressing-findings/) has the markers.
+
 ## Excluding paths
 
 Some prose is never worth grading: research captured from elsewhere, imported

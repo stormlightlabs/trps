@@ -1,6 +1,7 @@
 //! Text detectors for phrase-based and structural trope signals.
 
 pub mod char_class;
+pub mod dialect;
 pub mod markdown;
 pub mod repetition;
 pub mod structural;
@@ -9,6 +10,7 @@ use std::fmt::Display;
 
 use aho_corasick::{AhoCorasick, MatchKind};
 
+use crate::detector::dialect::{Dialect, DialectRule};
 use crate::errors::DetectorBuildError;
 use crate::patterns::{Pattern, Severity};
 use crate::patterns::{bundled_patterns, validate_patterns};
@@ -21,6 +23,7 @@ use crate::suppression::Suppressions;
 /// rule id exists needs both, which [`Detector::rule_ids`] joins.
 pub const BUILTIN_RULE_IDS: &[&str] = &[
     char_class::UNICODE_DECORATION_RULE_ID,
+    dialect::DIALECT_SPELLING.0,
     markdown::BOLD_FIRST_LEADS.0,
     repetition::CONTENT_DUPLICATION.0,
     repetition::DEAD_METAPHOR.0,
@@ -39,6 +42,7 @@ pub struct Detector {
     phrase_patterns: Vec<Pattern>,
     phrase_to_pattern: Vec<usize>,
     phrase_matcher: AhoCorasick,
+    dialect: Option<DialectRule>,
 }
 
 impl Detector {
@@ -70,7 +74,16 @@ impl Detector {
             phrase_patterns: patterns,
             phrase_to_pattern,
             phrase_matcher,
+            dialect: None,
         })
+    }
+
+    /// Turns on the dialect rule, which is off until a project names the
+    /// dialect it writes in.
+    pub fn with_dialect(mut self, dialect: Dialect) -> Result<Self, DetectorBuildError> {
+        self.dialect = Some(DialectRule::new(dialect)?);
+
+        Ok(self)
     }
 
     /// Every rule id this detector can report.
@@ -98,6 +111,11 @@ impl Detector {
         findings.extend(markdown::scan_markdown(text));
         findings.extend(structural::scan_structural(text));
         findings.extend(repetition::scan_repetition(text));
+
+        if let Some(rule) = &self.dialect {
+            findings.extend(rule.scan(text));
+        }
+
         findings.retain(|finding| !suppressions.covers(finding.span.start(), &finding.rule_id));
         findings.sort_by_key(|finding| finding.span.start());
         findings
@@ -116,6 +134,7 @@ impl Detector {
                     severity: pattern.severity,
                     kind: FindingKind::Phrase,
                     matched: text[mat.start()..mat.end()].to_owned(),
+                    expected: None,
                     span: Span(mat.start(), mat.end()),
                 }
             })
@@ -138,6 +157,11 @@ pub struct Finding {
     /// occurrences themselves: `formatting.unicode_decoration` reports
     /// `— — —` rather than the text between the first dash and the last.
     pub matched: String,
+    /// What the rule expected in place of `matched`, where the rule knows:
+    /// `word_choice.dialect_spelling` reports the spelling the project's
+    /// dialect uses. Every other rule reports what it found and leaves the
+    /// rewrite to the writer.
+    pub expected: Option<String>,
     /// Start & end byte offset.
     pub span: Span,
 }
@@ -150,6 +174,7 @@ impl Finding {
             severity: Severity::Medium,
             kind: FindingKind::Structural,
             matched: text[span.start()..span.end()].to_owned(),
+            expected: None,
             span,
         }
     }
@@ -162,6 +187,7 @@ impl Finding {
             severity,
             kind: FindingKind::Repetition,
             matched: text[span.start()..span.end()].to_owned(),
+            expected: None,
             span,
         }
     }
@@ -174,6 +200,7 @@ impl Finding {
             severity,
             kind: FindingKind::Markdown,
             matched: text[span.start()..span.end()].to_owned(),
+            expected: None,
             span,
         }
     }
@@ -192,6 +219,8 @@ pub enum FindingKind {
     Repetition,
     /// Markdown syntax matched by markdown-aware detectors.
     Markdown,
+    /// A word spelled against the project's dialect.
+    Spelling,
 }
 
 impl Display for FindingKind {
@@ -202,6 +231,7 @@ impl Display for FindingKind {
             FindingKind::Structural => "struct",
             FindingKind::Repetition => "repeat",
             FindingKind::Markdown => "markdown",
+            FindingKind::Spelling => "spelling",
         })
     }
 }
