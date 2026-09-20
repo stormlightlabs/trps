@@ -127,7 +127,7 @@ fn no_color_suppresses_the_escape_codes() {
 }
 
 #[test]
-fn a_multiline_match_is_indented_under_its_finding() {
+fn one_passage_is_reported_once_under_every_rule_that_saw_it() {
     let output = scan(
         None,
         "We built it fast.\nWe built it wrong.\nWe built it twice.\n",
@@ -138,13 +138,9 @@ fn a_multiline_match_is_indented_under_its_finding() {
     assert_eq!(
         stdout(&output),
         concat!(
-            "⚠ medium sentence_structure.anaphora_abuse\n",
-            "  ├─ struct 1:1-3:18\n",
-            "  └─ We built it fast.\n",
-            "     We built it wrong.\n",
-            "     We built it twice.\n",
-            "⚠ medium paragraph_structure.short_punchy_fragments\n",
-            "  ├─ struct 1:1-3:18\n",
+            "⚠ medium struct sentence_structure.anaphora_abuse\n",
+            "⚠ medium struct paragraph_structure.short_punchy_fragments\n",
+            "  ├─ 1:1-3:18\n",
             "  └─ We built it fast.\n",
             "     We built it wrong.\n",
             "     We built it twice.\n",
@@ -533,7 +529,7 @@ fn a_file_finding_reports_the_path_line_and_column() {
     let path = example("slop/word-choice.txt");
     let output = scan(Some(&path), "", &[("NO_COLOR", "1")]);
 
-    let expected = format!("  ├─ phrase {}:1:7-16\n", path.display());
+    let expected = format!("  ├─ {}:1:7-16\n", path.display());
     assert!(
         stdout(&output).contains(&expected),
         "expected {expected:?} in:\n{}",
@@ -552,8 +548,8 @@ fn a_stdin_finding_reports_the_line_and_column_alone() {
     assert_eq!(
         stdout(&output),
         concat!(
-            "⚠ medium word_choice.delve\n",
-            "  ├─ phrase 2:8-17\n",
+            "⚠ medium phrase word_choice.delve\n",
+            "  ├─ 2:8-17\n",
             "  └─ delve into\n",
         )
     );
@@ -567,11 +563,7 @@ fn crlf_text_reports_the_same_place_as_lf_text() {
     let lf = scan(None, prose, &environment);
     let crlf = scan(None, &prose.replace('\n', "\r\n"), &environment);
 
-    assert!(
-        stdout(&lf).contains("  ├─ phrase 2:8-17\n"),
-        "{}",
-        stdout(&lf)
-    );
+    assert!(stdout(&lf).contains("  ├─ 2:8-17\n"), "{}", stdout(&lf));
     assert_eq!(stdout(&crlf), stdout(&lf));
 }
 
@@ -650,7 +642,7 @@ fn a_marked_region_is_kept_out_of_the_report() {
 
     assert_eq!(output.status.code(), Some(1));
     assert!(
-        stdout(&output).contains("  ├─ phrase 5:17-26\n"),
+        stdout(&output).contains("  ├─ 5:17-26\n"),
         "{}",
         stdout(&output)
     );
@@ -751,11 +743,11 @@ fn a_dialect_reports_the_other_spelling_and_the_one_it_expects() {
     assert_eq!(
         stdout(&output),
         concat!(
-            "⚠ medium word_choice.dialect_spelling\n",
-            "  ├─ spelling input.md:1:5-13\n",
+            "⚠ medium spelling word_choice.dialect_spelling\n",
+            "  ├─ input.md:1:5-13\n",
             "  └─ judgement → judgment\n",
-            "⚠ medium word_choice.dialect_spelling\n",
-            "  ├─ spelling input.md:1:19-26\n",
+            "⚠ medium spelling word_choice.dialect_spelling\n",
+            "  ├─ input.md:1:19-26\n",
             "  └─ coloured → colored\n",
         )
     );
