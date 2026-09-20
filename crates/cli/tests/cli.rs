@@ -1,4 +1,4 @@
-//! Integration tests for the `tropius` command line.
+//! Integration tests for the `trps` command line.
 
 use std::fs;
 use std::io::Write;
@@ -575,7 +575,7 @@ fn run(
     input: &str,
     environment: &[(&str, &str)],
 ) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_tropius"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_trps"));
     command.env_remove("NO_COLOR");
     command.env_remove("FORCE_COLOR");
     command.env_remove("CLICOLOR_FORCE");

@@ -10,7 +10,7 @@ homepage.workspace = true
 keywords.workspace = true
 
 [[bin]]
-name = "tropius"
+name = "trps"
 path = "src/main.rs"
 
 [dependencies]
