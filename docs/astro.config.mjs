@@ -20,7 +20,10 @@ export default defineConfig({
         "@fontsource-variable/google-sans-code",
         "./src/styles/theme.css",
       ],
-      sidebar: [{ label: "Documentation", items: [{ autogenerate: { directory: "." } }] }],
+      sidebar: [
+        { label: "Overview", link: "/" },
+        { label: "Reference", items: [{ autogenerate: { directory: "reference" } }] },
+      ],
     }),
   ],
 });
