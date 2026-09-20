@@ -22,6 +22,26 @@ files needs no heading to say which one it is reading. Text from stdin has no
 path and reports the line and column alone. Columns are 1-based, count
 characters rather than bytes, and both ends are inclusive.
 
+## One passage, one entry
+
+A passage can trip more than one rule. An entry names every rule that fired,
+its severity and the detector behind it, then quotes the passage once:
+
+```
+⚠ medium struct sentence_structure.anaphora_abuse
+⚠ medium struct paragraph_structure.short_punchy_fragments
+  ├─ draft.md:1:1-55
+  └─ We built it fast. We built it wrong. We built it twice.
+```
+
+Rules share an entry only where they cover the same span. A rule that fires
+inside a longer finding keeps an entry of its own, because a paragraph rule
+covers every phrase under it and folding those away would hide the rules that
+say the most about the text.
+
+`--json` lists each finding on its own, whatever it shares a span with. See
+[JSON output](/reference/json-output/).
+
 Scan article text extracted from a live URL with
 [lectito](https://lectito.stormlightlabs.org/):
 
@@ -64,9 +84,9 @@ Such a finding names every place the run appears, because whether a repetition
 is a house convention or a tic is yours to decide:
 
 ```
-⚠ medium composition.cross_file_duplication
-  ├─ repeat docs/one.md:12:22-54
-  ├─ repeat docs/two.md:40:28-60
+⚠ medium repeat composition.cross_file_duplication
+  ├─ docs/one.md:12:22-54
+  ├─ docs/two.md:40:28-60
   └─ rather than left to be discovered
 ```
 

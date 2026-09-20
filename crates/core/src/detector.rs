@@ -103,6 +103,14 @@ impl Detector {
     ///
     /// Findings the text suppressed in place are dropped here rather than by
     /// the caller, so every reader of a scan sees the same document.
+    ///
+    /// A rule that reports one span twice is reported once.
+    /// `composition.content_duplication` reaches a paragraph holding a single
+    /// sentence through both of its passes, and two findings agreeing on
+    /// every field describe one problem.
+    ///
+    /// Findings come back ordered by span, so the ones covering the same text
+    /// sit together and [`group_by_span`] can collect them.
     pub fn scan(&self, text: &str) -> Vec<Finding> {
         let masked = markdown::mask_non_prose(text);
         let text = masked.as_str();
@@ -119,7 +127,8 @@ impl Detector {
         }
 
         findings.retain(|finding| !suppressions.covers(finding.span.start(), &finding.rule_id));
-        findings.sort_by_key(|finding| finding.span.start());
+        findings.sort_by_key(|finding| (finding.span.start(), finding.span.end()));
+        findings.dedup();
         findings
     }
 
@@ -205,6 +214,27 @@ impl Finding {
             span,
         }
     }
+}
+
+/// Collects the findings that cover exactly the same span.
+///
+/// Several heuristics can see one passage. Three short sentences opening the
+/// same way trip both `sentence_structure.anaphora_abuse` and
+/// `paragraph_structure.short_punchy_fragments`. Printed apart they show the
+/// reader those sentences twice and leave the reader to work out that it is
+/// one problem, so a report quotes the passage once under every rule that
+/// fired on it.
+///
+/// Spans have to be equal rather than merely overlap. A paragraph rule covers
+/// every phrase finding inside it, and `composition.fractal_summaries` can
+/// cover a whole document. Folding a contained finding into the one around it
+/// would hide the rules that say the most about the text.
+///
+/// The findings must be ordered the way [`Detector::scan`] returns them,
+/// which puts equal spans next to each other. Each group holds at least one
+/// finding.
+pub fn group_by_span(findings: &[Finding]) -> impl Iterator<Item = &[Finding]> {
+    findings.chunk_by(|left, right| left.span == right.span)
 }
 
 /// The kind of detector that produced a finding.
@@ -727,6 +757,60 @@ mod tests {
 
         assert_eq!(paragraph_spans(unix).len(), 2);
         assert_eq!(paragraph_spans(windows).len(), 2);
+    }
+
+    #[test]
+    fn findings_covering_one_passage_group_into_one_entry() {
+        let detector = Detector::bundled().unwrap();
+        let text = "We built it fast.\nWe built it wrong.\nWe built it twice.\n";
+        let findings = detector.scan(text);
+        let groups: Vec<_> = group_by_span(&findings).collect();
+
+        assert_eq!(groups.len(), 1, "one passage is one entry");
+        assert_eq!(
+            groups[0]
+                .iter()
+                .map(|finding| finding.rule_id.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                structural::ANAPHORA_ABUSE.0,
+                structural::SHORT_PUNCHY_FRAGMENTS.0,
+            ]
+        );
+    }
+
+    #[test]
+    fn a_finding_inside_another_stays_its_own_entry() {
+        let detector = Detector::bundled().unwrap();
+        let text = "It's not bold. It's backwards. Not a bug. Not a feature. Just a habit.\n";
+        let findings = detector.scan(text);
+        let groups: Vec<_> = group_by_span(&findings).collect();
+
+        assert!(
+            findings
+                .iter()
+                .any(|finding| finding.rule_id == "sentence_structure.not_x_not_y"),
+            "the phrase rule fires inside the paragraph the structural rule covers"
+        );
+        assert_eq!(groups.len(), findings.len(), "no two spans are equal");
+    }
+
+    #[test]
+    fn one_rule_reporting_a_passage_twice_reports_it_once() {
+        let detector = Detector::bundled().unwrap();
+        let paragraph = "The loader reads the dictionary and merges it over the bundled one.\n";
+        let text = format!("{paragraph}\n{paragraph}");
+        let duplication: Vec<_> = detector
+            .scan(&text)
+            .into_iter()
+            .filter(|finding| finding.rule_id == repetition::CONTENT_DUPLICATION.0)
+            .collect();
+
+        assert_eq!(
+            duplication.len(),
+            1,
+            "the paragraph pass and the sentence pass describe one repetition"
+        );
     }
 
     #[test]

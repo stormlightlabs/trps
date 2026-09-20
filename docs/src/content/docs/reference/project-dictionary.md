@@ -85,8 +85,8 @@ A finding names the spelling it found and the one the dialect uses, in the case
 you wrote it:
 
 ```
-⚠ medium word_choice.dialect_spelling
-  ├─ spelling docs/guide.md:1:5-13
+⚠ medium spelling word_choice.dialect_spelling
+  ├─ docs/guide.md:1:5-13
   └─ judgement → judgment
 ```
 

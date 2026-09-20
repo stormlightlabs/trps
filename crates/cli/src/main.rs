@@ -14,6 +14,7 @@ use trps_core::{
     detector::{
         Detector, Finding, FindingKind, LineIndex, Location,
         cross_file::{CrossFileFinding, CrossFileLimits, scan_cross_file},
+        group_by_span,
     },
     excludes::Excludes,
     patterns::{
@@ -347,8 +348,8 @@ fn print_report(scanned: &[(Source, Vec<Finding>)], shared: &[CrossFileFinding])
     let indexes = line_indexes(scanned);
 
     for ((source, findings), index) in scanned.iter().zip(&indexes) {
-        for finding in findings {
-            print_finding(finding, &source.name, index);
+        for group in group_by_span(findings) {
+            print_group(group, &source.name, index);
         }
     }
 
@@ -373,12 +374,11 @@ fn print_shared_finding(
     scanned: &[(Source, Vec<Finding>)],
     indexes: &[LineIndex],
 ) {
-    print_heading(finding.severity, &finding.rule_id);
+    print_heading(finding.severity, FindingKind::Repetition, &finding.rule_id);
 
     for occurrence in &finding.occurrences {
         println!(
-            "  ├─ {} {}",
-            FindingKind::Repetition.label(),
+            "  ├─ {}",
             origin(
                 &scanned[occurrence.document].0.name,
                 indexes[occurrence.document].locate_span(occurrence.span),
@@ -392,22 +392,53 @@ fn print_shared_finding(
     );
 }
 
-fn print_finding(finding: &Finding, name: &str, index: &LineIndex) {
-    print_heading(finding.severity, &finding.rule_id);
-    println!(
-        "  ├─ {} {}",
-        finding.kind.label(),
-        origin(name, index.locate_span(finding.span)),
-    );
-    println!("  └─ {}", matched_text(finding));
+/// Prints one passage as one entry: every rule that fired on it, then where
+/// it is and what it says.
+///
+/// Each rule names its own detector, because two rules sharing a span need
+/// not have come from the same one. The entry quotes each distinct text once,
+/// which is nearly always one. A rule that counts occurrences instead of
+/// quoting its span, as `formatting.unicode_decoration` does, is what makes
+/// more than one possible.
+fn print_group(group: &[Finding], name: &str, index: &LineIndex) {
+    for finding in group {
+        print_heading(finding.severity, finding.kind, &finding.rule_id);
+    }
+
+    let mut quoted: Vec<String> = Vec::new();
+
+    for finding in group {
+        let matched = matched_text(finding);
+
+        if !quoted.contains(&matched) {
+            quoted.push(matched);
+        }
+    }
+
+    let (last, rest) = quoted
+        .split_last()
+        .expect("a group holds at least one finding");
+
+    println!("  ├─ {}", origin(name, index.locate_span(group[0].span)));
+
+    for matched in rest {
+        println!("  ├─ {matched}");
+    }
+
+    println!("  └─ {last}");
 }
 
-/// Prints the first line of a finding: its severity and the rule that fired.
-fn print_heading(severity: Severity, rule_id: &str) {
+/// Prints the first line of a finding: its severity, the detector it came
+/// from, and the rule that fired.
+///
+/// The detector belongs here rather than beside the place, because an entry
+/// holding several rules need not have them from one detector.
+fn print_heading(severity: Severity, kind: FindingKind, rule_id: &str) {
     println!(
-        "{} {} {}",
+        "{} {} {} {}",
         severity.symbol(),
         severity_label(severity),
+        kind.label(),
         rule_id.if_supports_color(Stream::Stdout, |text| text.bold()),
     );
 }
