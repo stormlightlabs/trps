@@ -27,7 +27,7 @@ const STDIN_NAME: &str = "-";
 const REPORT_VERSION: u32 = 1;
 
 #[derive(Debug, Parser)]
-#[command(about = "Detect AI writing tropes in prose.")]
+#[command(name = "tropius", about = "Detect AI writing tropes in prose.")]
 struct Args {
     /// Files to scan. Reads stdin when none are given.
     inputs: Vec<PathBuf>,

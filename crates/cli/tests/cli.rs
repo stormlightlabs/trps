@@ -575,7 +575,7 @@ fn run(
     input: &str,
     environment: &[(&str, &str)],
 ) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_tropius-cli"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_tropius"));
     command.env_remove("NO_COLOR");
     command.env_remove("FORCE_COLOR");
     command.env_remove("CLICOLOR_FORCE");
