@@ -23,9 +23,9 @@ Findings report
 printf 'Let us delve into this robust ecosystem.' | cargo run -q -p tropius-cli
 ```
 
-The rest of the usage documentation lives at
-[trps.stormlightlabs.org](https://trps.stormlightlabs.org): scanning files, the
-JSON report, the project dictionary, and the ignore markers.
+See [`docs/src/content/docs/reference/`](./docs/src/content/docs/reference/)
+for the rest: scanning files, the JSON report, the project dictionary, and the
+ignore markers.
 
 ## Coverage
 
