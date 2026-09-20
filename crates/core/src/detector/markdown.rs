@@ -9,9 +9,8 @@ pub const BOLD_FIRST_BULLETS: (&str, &str) =
 
 /// Bolded leads in a row before the run is reported.
 ///
-/// One bolded lead is emphasis and two are a pair, either of which a writer
-/// reaches for once. A third makes the opening a template the blocks after it
-/// are filled into, which is the trope.
+/// A writer reaches for one bolded lead, and sometimes for two. Three in a
+/// row is an opening filled in from a template, which is the trope.
 const BOLD_LEAD_THRESHOLD: usize = 3;
 
 use crate::patterns::Severity;
@@ -20,10 +19,9 @@ use super::{Finding, Span};
 
 /// Finds markdown-specific trope signals.
 ///
-/// A bulleted list and a run of paragraphs are read the same way, because the
-/// trope is the run rather than any one bolded span, and the paragraph form
-/// ships as often as the list one. One finding covers one run, from the first
-/// lead to the last.
+/// A run of bolded leads is the signal, so a list and a sequence of
+/// paragraphs are read the same way. One finding covers one run, from the
+/// first lead to the last.
 pub fn scan_markdown(text: &str) -> Vec<Finding> {
     let mut findings = Vec::new();
     let mut run = Vec::new();
@@ -59,16 +57,15 @@ fn report_run(text: &str, run: &[Span]) -> Option<Finding> {
 /// Every block of `text` that can open with a bolded span, with whether it
 /// does.
 ///
-/// A list item is one block and a paragraph is one, because each carries a
-/// single lead. A wrapped line continues the block above rather than opening
-/// one, so a bullet running over two lines is one lead rather than a lead
-/// followed by a line that ends the run. A heading, a table row, and a block
-/// quote open no lead and end the run they interrupt.
+/// A list item is one block, and so is a paragraph, because each carries a
+/// single lead. A wrapped line continues the block above it, so a bullet
+/// running over two lines is one lead and not a break in the run. A heading,
+/// a table row, and a block quote carry no lead and end the run they
+/// interrupt.
 ///
-/// A blank line ends a block without ending a run: paragraphs are separated
-/// by blank lines, and a fenced block reaches here blanked by
-/// [`mask_non_prose`], so a template holds across the samples between its
-/// steps.
+/// A blank line ends a block without ending a run. Paragraphs are separated
+/// by blank lines, and [`mask_non_prose`] has already blanked the fenced
+/// blocks, so a run holds across a sample sitting between two of its steps.
 fn blocks(text: &str) -> Vec<(Span, bool)> {
     let mut blocks: Vec<(Span, bool)> = Vec::new();
     let mut open = false;
