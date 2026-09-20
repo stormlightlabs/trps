@@ -4,7 +4,9 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::detector::cross_file::CrossFileLimits;
+use serde::{Deserialize, Deserializer, de};
+
+use crate::detector::cross_file::{CROSS_FILE_DUPLICATION, CrossFileLimits};
 use crate::detector::dialect::Dialect;
 use crate::errors::{PatternLoadError, PatternValidationError};
 
@@ -123,10 +125,6 @@ pub struct PatternFile {
     /// case-insensitively.
     #[serde(default)]
     pub allow: Vec<String>,
-    /// What the project counts as a repetition worth reporting across its
-    /// files. See [`CrossFileLimits`].
-    #[serde(default)]
-    pub cross_file: CrossFileLimits,
     /// The English dialect the project writes in, where it names one.
     ///
     /// Naming one turns on `word_choice.dialect_spelling`, which reports
@@ -141,12 +139,57 @@ pub struct PatternFile {
     /// Pattern entries declared by the file.
     #[serde(default)]
     pub patterns: Vec<Pattern>,
+    /// The counts the project tunes. See [`Thresholds`].
+    #[serde(default)]
+    pub thresholds: Thresholds,
 }
 
 impl PatternFile {
     /// Deserializes a pattern file from TOML text.
     pub fn from_toml(input: &str) -> Result<Self, toml::de::Error> {
         toml::from_str(input)
+    }
+}
+
+/// The counts a project tunes, keyed by the rule id a finding prints.
+///
+/// A rule that fires at a count reads it from here, so a project that finds
+/// one too loose or too strict raises it rather than silencing the rule.
+/// Every entry defaults to the count the tool ships with, so a dictionary
+/// setting none of them scans as it does now.
+///
+/// A key naming no rule is kept rather than rejected. The keys are rule ids
+/// rather than fields, so `deny_unknown_fields` would fail the dictionary
+/// over a typo; [`Thresholds::unknown_rules`] hands the key to a run to warn
+/// about instead.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Thresholds {
+    /// What counts as a repetition several files share, under
+    /// `composition.cross_file_duplication`. See [`CrossFileLimits`].
+    pub cross_file_duplication: CrossFileLimits,
+    unknown: Vec<String>,
+}
+
+impl Thresholds {
+    /// The keys of the table that name no rule.
+    pub fn unknown_rules(&self) -> impl Iterator<Item = &str> {
+        self.unknown.iter().map(String::as_str)
+    }
+}
+
+impl<'de> Deserialize<'de> for Thresholds {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let mut thresholds = Self::default();
+
+        for (key, value) in toml::Table::deserialize(deserializer)? {
+            if key == CROSS_FILE_DUPLICATION.0 {
+                thresholds.cross_file_duplication = value.try_into().map_err(de::Error::custom)?;
+            } else {
+                thresholds.unknown.push(key);
+            }
+        }
+
+        Ok(thresholds)
     }
 }
 
@@ -728,6 +771,70 @@ phrases = ["bounded"]
             Some(Dialect::British)
         );
         assert_eq!(PatternFile::default().dialect, None);
+    }
+
+    #[test]
+    fn a_dictionary_tunes_a_count_under_the_rule_that_reads_it() {
+        let file = PatternFile::from_toml(
+            r#"
+[thresholds."composition.cross_file_duplication"]
+min_words = 20
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            file.thresholds.cross_file_duplication,
+            CrossFileLimits {
+                min_words: 20,
+                min_files: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn a_dictionary_tuning_nothing_keeps_every_default() {
+        let file = PatternFile::from_toml(r#"allow = ["harness"]"#).unwrap();
+
+        assert_eq!(file.thresholds, Thresholds::default());
+        assert_eq!(
+            file.thresholds.cross_file_duplication,
+            CrossFileLimits::default()
+        );
+        assert_eq!(file.thresholds.unknown_rules().count(), 0);
+    }
+
+    #[test]
+    fn a_threshold_key_naming_no_rule_is_kept_rather_than_rejected() {
+        let file = PatternFile::from_toml(
+            r#"
+[thresholds."composition.cross_file_duplicaton"]
+min_words = 20
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            file.thresholds.unknown_rules().collect::<Vec<_>>(),
+            ["composition.cross_file_duplicaton"]
+        );
+        assert_eq!(
+            file.thresholds.cross_file_duplication,
+            CrossFileLimits::default()
+        );
+    }
+
+    #[test]
+    fn a_threshold_entry_rejects_a_count_its_rule_does_not_have() {
+        let error = PatternFile::from_toml(
+            r#"
+[thresholds."composition.cross_file_duplication"]
+min_word = 20
+"#,
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("unknown field"));
     }
 
     #[test]

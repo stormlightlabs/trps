@@ -13,7 +13,7 @@ use aho_corasick::{AhoCorasick, MatchKind};
 
 use crate::detector::dialect::{Dialect, DialectRule};
 use crate::errors::DetectorBuildError;
-use crate::patterns::{Pattern, Severity};
+use crate::patterns::{Pattern, Severity, Thresholds};
 use crate::patterns::{bundled_patterns, validate_patterns};
 use crate::suppression::Suppressions;
 
@@ -46,6 +46,7 @@ pub struct Detector {
     phrase_to_pattern: Vec<usize>,
     phrase_matcher: AhoCorasick,
     dialect: Option<DialectRule>,
+    thresholds: Thresholds,
 }
 
 impl Detector {
@@ -78,6 +79,7 @@ impl Detector {
             phrase_to_pattern,
             phrase_matcher,
             dialect: None,
+            thresholds: Thresholds::default(),
         })
     }
 
@@ -87,6 +89,23 @@ impl Detector {
         self.dialect = Some(DialectRule::new(dialect)?);
 
         Ok(self)
+    }
+
+    /// Applies the counts a project tuned, which [`Detector::new`] leaves at
+    /// the ones the tool ships with.
+    pub fn with_thresholds(mut self, thresholds: Thresholds) -> Self {
+        self.thresholds = thresholds;
+        self
+    }
+
+    /// The counts this detector scans at.
+    ///
+    /// A rule reading a count inside [`Detector::scan`] takes it from here. A
+    /// rule that reads a whole run rather than one text is scanned by the
+    /// caller, so `composition.cross_file_duplication` takes its entry
+    /// through this.
+    pub fn thresholds(&self) -> &Thresholds {
+        &self.thresholds
     }
 
     /// Every rule id this detector can report.
@@ -515,6 +534,8 @@ impl<'a> LineIndex<'a> {
 mod tests {
     use super::*;
 
+    use crate::patterns::PatternFile;
+
     #[test]
     fn bundled_detector_finds_phrase_patterns() {
         let detector = Detector::bundled().unwrap();
@@ -812,6 +833,29 @@ mod tests {
             duplication.len(),
             1,
             "the paragraph pass and the sentence pass describe one repetition"
+        );
+    }
+
+    #[test]
+    fn a_detector_carries_the_counts_a_dictionary_tuned() {
+        let thresholds = PatternFile::from_toml(
+            r#"
+[thresholds."composition.cross_file_duplication"]
+min_words = 20
+"#,
+        )
+        .unwrap()
+        .thresholds;
+        let detector = Detector::bundled().unwrap().with_thresholds(thresholds);
+
+        assert_eq!(
+            detector.thresholds().cross_file_duplication.min_words,
+            20,
+            "the entry the cross-file rule reads travels on the detector"
+        );
+        assert_eq!(
+            Detector::bundled().unwrap().thresholds(),
+            &Thresholds::default()
         );
     }
 
