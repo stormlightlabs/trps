@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::detector::cross_file::CrossFileLimits;
 use crate::detector::dialect::Dialect;
 use crate::errors::{PatternLoadError, PatternValidationError};
 
@@ -122,6 +123,10 @@ pub struct PatternFile {
     /// case-insensitively.
     #[serde(default)]
     pub allow: Vec<String>,
+    /// What the project counts as a repetition worth reporting across its
+    /// files. See [`CrossFileLimits`].
+    #[serde(default)]
+    pub cross_file: CrossFileLimits,
     /// The English dialect the project writes in, where it names one.
     ///
     /// Naming one turns on `word_choice.dialect_spelling`, which reports

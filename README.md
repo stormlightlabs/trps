@@ -42,6 +42,7 @@ ignore markers, and where the rules come from.
 - phrasings measured as over-represented in generated fiction
 - structural detectors for sentence and paragraph shape
 - repetition detectors for repeated metaphor terms and duplicated content
+- a cross-file rule for what several scanned files repeat between them
 - markdown-aware detection for bold-first leads, in bullets and paragraphs
 - character-class detection for Unicode decoration
 

@@ -105,6 +105,28 @@ Spelling inside a fenced block or front matter is never graded, and a single
 finding can be suppressed the way any other is. [Suppressing
 findings](/reference/suppressing-findings/) has the markers.
 
+## Tuning what repeats across files
+
+`composition.cross_file_duplication` reports the wording a run's files share.
+[Usage](/reference/usage/) says what it reads; here is what a project sets. Six
+words in two files is the default, and a project that reuses more of its own
+wording than that raises either number:
+
+```toml
+[cross_file]
+min_words = 10
+min_files = 3
+```
+
+`min_words` counts the words of a shared run as the comparison reads them.
+`min_files` counts the files a run has to appear in, not the times it appears:
+a run used twice in one file and once in another is in two files. Two is the
+floor for both, and a smaller number is read as two.
+
+Raise `min_words` when what gets reported is house phrasing you mean to keep.
+Raise `min_files` when a pair of documents is expected to overlap and a third
+would be the signal.
+
 ## Excluding paths
 
 Some prose is never worth grading: research captured from elsewhere, imported

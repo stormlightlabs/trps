@@ -417,6 +417,118 @@ fn json_over_several_paths_carries_a_clean_run_as_an_empty_list() {
 }
 
 #[test]
+fn a_run_two_files_share_is_reported_once_naming_both() {
+    let directory = case_dir("cross-file");
+    write(
+        &directory,
+        "first.md",
+        "The loader reads it, rather than left to be discovered.\n",
+    );
+    write(
+        &directory,
+        "second.md",
+        "A default is written down, rather than left to be discovered.\n",
+    );
+
+    let output = run(
+        Some(&directory),
+        &["first.md", "second.md"],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+    let report = stdout(&output);
+
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(
+        report.matches("composition.cross_file_duplication").count(),
+        1,
+        "a repetition is one finding rather than one per file:\n{report}"
+    );
+    assert_eq!(
+        stderr(&output),
+        "",
+        "a run that found a repetition is not a clean run"
+    );
+    assert!(report.contains("first.md:1:22-54"), "{report}");
+    assert!(report.contains("second.md:1:28-60"), "{report}");
+    assert!(report.contains("rather than left to be discovered"));
+}
+
+#[test]
+fn a_dictionary_raises_the_cross_file_thresholds() {
+    let directory = case_dir("cross-file-limits");
+    write(
+        &directory,
+        "first.md",
+        "The loader reads it, rather than left to be discovered.\n",
+    );
+    write(
+        &directory,
+        "second.md",
+        "A default is written down, rather than left to be discovered.\n",
+    );
+    write(&directory, "trps.toml", "[cross_file]\nmin_words = 20\n");
+
+    let output = run(
+        Some(&directory),
+        &["first.md", "second.md"],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stdout(&output), "");
+}
+
+#[test]
+fn json_carries_a_shared_run_once_with_every_place_it_appears() {
+    let directory = case_dir("cross-file-json");
+    write(
+        &directory,
+        "first.md",
+        "The loader reads it, rather than left to be discovered.\n",
+    );
+    write(
+        &directory,
+        "second.md",
+        "A default is written down, rather than left to be discovered.\n",
+    );
+
+    let output = run(
+        Some(&directory),
+        &["--json", "first.md", "second.md"],
+        "",
+        &[],
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&output)).expect("the report is JSON");
+    let shared = &report["cross_file"][0];
+
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(report["cross_file"].as_array().map(Vec::len), Some(1));
+    assert_eq!(shared["rule_id"], "composition.cross_file_duplication");
+    assert_eq!(shared["kind"], "repeat");
+    assert_eq!(shared["matched"], "rather than left to be discovered");
+    assert_eq!(
+        shared["occurrences"],
+        serde_json::json!([
+            {"path": "first.md", "line": 1, "column": 22},
+            {"path": "second.md", "line": 1, "column": 28},
+        ])
+    );
+
+    let alone = run(Some(&directory), &["--json", "first.md"], "", &[]);
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&alone)).expect("the report is JSON");
+
+    assert_eq!(alone.status.code(), Some(0));
+    assert!(
+        report.get("cross_file").is_none(),
+        "one path cannot repeat across files, and the key is left out"
+    );
+}
+
+#[test]
 fn a_file_finding_reports_the_path_line_and_column() {
     let path = example("slop/word-choice.txt");
     let output = scan(Some(&path), "", &[("NO_COLOR", "1")]);
