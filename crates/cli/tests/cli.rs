@@ -482,7 +482,7 @@ fn a_marked_region_is_kept_out_of_the_report() {
 fn a_marker_naming_a_rule_keeps_the_other_findings() {
     let output = scan(
         None,
-        "<!-- trps-ignore-next-line word_choice.delve -->\nLet us delve into a → world.\n",
+        "<!-- trps-ignore-next-line word_choice.delve -->\nLet us delve into a → b → c → world.\n",
         &[("NO_COLOR", "1")],
     );
 

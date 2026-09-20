@@ -218,6 +218,39 @@ impl Span {
     }
 }
 
+/// The blank-line separated sections of the text, each trimmed of the
+/// whitespace around it.
+///
+/// Several detectors threshold per section rather than per occurrence, so the
+/// split lives here rather than once in each of them.
+pub(crate) fn paragraph_spans(text: &str) -> Vec<Span> {
+    let mut spans = Vec::new();
+    let mut start = 0;
+
+    for (index, _) in text.match_indices("\n\n") {
+        push_trimmed_span(text, &mut spans, start, index);
+        start = index + 2;
+    }
+
+    push_trimmed_span(text, &mut spans, start, text.len());
+    spans
+}
+
+/// Pushes `start..end` with the whitespace around it trimmed off, dropping a
+/// span that holds nothing else.
+pub(crate) fn push_trimmed_span(text: &str, spans: &mut Vec<Span>, start: usize, end: usize) {
+    let value = &text[start..end];
+
+    if value.trim().is_empty() {
+        return;
+    }
+
+    let leading = value.len() - value.trim_start().len();
+    let trailing = value.len() - value.trim_end().len();
+
+    spans.push(Span(start + leading, end - trailing));
+}
+
 /// A one-based line and column in the scanned text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Location {
@@ -449,7 +482,8 @@ mod tests {
     #[test]
     fn a_marker_naming_a_rule_leaves_the_other_findings_alone() {
         let detector = Detector::bundled().unwrap();
-        let text = "trps-ignore-next-line word_choice.delve\nLet us delve into a → world.\n";
+        let text =
+            "trps-ignore-next-line word_choice.delve\nLet us delve into a → b → c → world.\n";
         let findings = detector.scan(text);
 
         assert!(
@@ -467,7 +501,7 @@ mod tests {
     #[test]
     fn scan_includes_unicode_decoration() {
         let detector = Detector::bundled().unwrap();
-        let findings = detector.scan("Input → output");
+        let findings = detector.scan("Input → output → result → done");
 
         assert!(
             findings
