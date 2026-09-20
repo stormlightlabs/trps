@@ -40,9 +40,8 @@ struct Args {
     json: bool,
 }
 
-/// What a run's project dictionary decides: the detector built from it, the
-/// paths it keeps out of the scan, and the file itself so the JSON report can
-/// name it.
+/// What a run's project dictionary decides. The file itself is kept so the
+/// JSON report can name it.
 struct Rules {
     detector: Detector,
     excludes: Excludes,
@@ -74,7 +73,7 @@ struct ReportFinding<'a> {
     line: usize,
     column: usize,
     matched: &'a str,
-    /// The spelling the project's dialect uses, on the dialect rule alone.
+    /// The spelling the project's dialect uses. Only the dialect rule sets it.
     #[serde(skip_serializing_if = "Option::is_none")]
     expected: Option<&'a str>,
 }
@@ -235,12 +234,12 @@ fn print_json(
     Ok(())
 }
 
-/// Warns about a marker naming a rule nothing reports, which suppresses
-/// nothing and would otherwise fail in silence.
+/// Warns about a marker naming a rule nothing reports. The marker suppresses
+/// nothing, and nothing else in a run says so.
 ///
 /// Warnings go to stderr, so a `--json` run still writes one document to
-/// stdout, and they do not change the exit code: a typo in a marker is worth
-/// saying and not worth failing a build over.
+/// stdout, and they leave the exit code alone: a typo in a marker does not
+/// fail a build.
 fn warn_unknown_rules(scanned: &[(Source, Vec<Finding>)], detector: &Detector) {
     for (source, _) in scanned {
         let index = LineIndex::new(&source.text);
@@ -285,7 +284,7 @@ fn print_finding(finding: &Finding, name: &str, index: &LineIndex) {
 }
 
 /// Renders what a finding matched, and the form it expected where the rule
-/// carries one, so a dialect fix needs no lookup.
+/// carries one.
 fn matched_text(finding: &Finding) -> String {
     let matched = indented_match(&finding.matched)
         .if_supports_color(Stream::Stdout, |text| text.yellow())
@@ -300,9 +299,8 @@ fn matched_text(finding: &Finding) -> String {
     }
 }
 
-/// Renders where a finding is, as `path:line:column-column`, dropping the
-/// path for stdin, which has none, and the end line for a finding that sits
-/// on one line.
+/// Renders where a finding is, as `path:line:column-column`, collapsing the
+/// end line for a finding that sits on one line.
 fn origin(name: &str, (start, end): (Location, Location)) -> String {
     let range = match start.line == end.line {
         true => format!("{start}-{}", end.column),
@@ -312,8 +310,8 @@ fn origin(name: &str, (start, end): (Location, Location)) -> String {
     in_file(name, range)
 }
 
-/// Prefixes a place in a file with the file, dropping the path for stdin,
-/// which has none.
+/// Prefixes a place in a file with its path. Text read from stdin has no
+/// path, so it gets the place alone.
 fn in_file(name: &str, place: String) -> String {
     match name == STDIN_NAME {
         true => place,
