@@ -158,10 +158,17 @@ impl PatternFile {
 /// Every entry defaults to the count the tool ships with, so a dictionary
 /// setting none of them scans as it does now.
 ///
+/// A rule id holds a dot, so a header written without quotes is a table
+/// nested a segment at a time: `[thresholds.composition.cross_file_duplication]`
+/// and `[thresholds."composition.cross_file_duplication"]` are different TOML
+/// and the same rule. Both reach the same entry, because a project that writes
+/// the obvious one is tuning the rule either way.
+///
 /// A key naming no rule is kept rather than rejected. The keys are rule ids
 /// rather than fields, so `deny_unknown_fields` would fail the dictionary
 /// over a typo; [`Thresholds::unknown_rules`] hands the key to a run to warn
-/// about instead.
+/// about instead, spelled as the whole id rather than the segment it starts
+/// with.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Thresholds {
     /// What counts as a repetition several files share, under
@@ -175,19 +182,51 @@ impl Thresholds {
     pub fn unknown_rules(&self) -> impl Iterator<Item = &str> {
         self.unknown.iter().map(String::as_str)
     }
+
+    /// Reads the entries of one table, where `prefix` is the part of the rule
+    /// id its keys hang under and is empty for `[thresholds]` itself.
+    ///
+    /// A key that finishes a rule id is that rule's entry. A key that finishes
+    /// none and holds nothing but tables is a segment of a longer id, so it is
+    /// joined to the keys beneath it and read again. Anything else names no
+    /// rule and is kept for a run to warn about.
+    fn read<E: de::Error>(&mut self, prefix: &str, table: toml::Table) -> Result<(), E> {
+        for (key, value) in table {
+            let rule = match prefix.is_empty() {
+                true => key,
+                false => format!("{prefix}.{key}"),
+            };
+
+            if rule == CROSS_FILE_DUPLICATION.0 {
+                self.cross_file_duplication = value.try_into().map_err(de::Error::custom)?;
+                continue;
+            }
+
+            match value {
+                toml::Value::Table(nested) if groups_rules(&nested) => self.read(&rule, nested)?,
+                _ => self.unknown.push(rule),
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Whether a table under a key naming no rule holds the rest of longer ids.
+///
+/// Every count a rule tunes is a plain value, so a table of nothing but tables
+/// carries no entry of its own and is the middle of a dotted header. An empty
+/// table carries nothing either way, and reads as the entry it was written as
+/// so the key it names is warned about rather than dropped.
+fn groups_rules(table: &toml::Table) -> bool {
+    !table.is_empty() && table.values().all(toml::Value::is_table)
 }
 
 impl<'de> Deserialize<'de> for Thresholds {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let mut thresholds = Self::default();
 
-        for (key, value) in toml::Table::deserialize(deserializer)? {
-            if key == CROSS_FILE_DUPLICATION.0 {
-                thresholds.cross_file_duplication = value.try_into().map_err(de::Error::custom)?;
-            } else {
-                thresholds.unknown.push(key);
-            }
-        }
+        thresholds.read("", toml::Table::deserialize(deserializer)?)?;
 
         Ok(thresholds)
     }
@@ -793,6 +832,26 @@ min_words = 20
     }
 
     #[test]
+    fn a_rule_id_written_without_quotes_tunes_the_same_count() {
+        let file = PatternFile::from_toml(
+            r#"
+[thresholds.composition.cross_file_duplication]
+min_words = 20
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            file.thresholds.cross_file_duplication,
+            CrossFileLimits {
+                min_words: 20,
+                min_files: 2,
+            }
+        );
+        assert_eq!(file.thresholds.unknown_rules().count(), 0);
+    }
+
+    #[test]
     fn a_dictionary_tuning_nothing_keeps_every_default() {
         let file = PatternFile::from_toml(r#"allow = ["harness"]"#).unwrap();
 
@@ -817,6 +876,29 @@ min_words = 20
         assert_eq!(
             file.thresholds.unknown_rules().collect::<Vec<_>>(),
             ["composition.cross_file_duplicaton"]
+        );
+        assert_eq!(
+            file.thresholds.cross_file_duplication,
+            CrossFileLimits::default()
+        );
+    }
+
+    #[test]
+    fn an_unquoted_key_naming_no_rule_is_kept_under_the_id_it_spells() {
+        let file = PatternFile::from_toml(
+            r#"
+[thresholds.composition.cross_file_duplicaton]
+min_words = 20
+
+[thresholds.compositon]
+min_words = 20
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            file.thresholds.unknown_rules().collect::<Vec<_>>(),
+            ["composition.cross_file_duplicaton", "compositon"]
         );
         assert_eq!(
             file.thresholds.cross_file_duplication,
