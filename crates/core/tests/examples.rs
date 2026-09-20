@@ -33,6 +33,7 @@ const SLOP_RULES: &[(&str, &[&str])] = &[
             "assistant.unfilled_placeholder",
         ],
     ),
+    ("bold-leads.md", &["formatting.bold_first_leads"]),
     (
         "composition.txt",
         &[
@@ -46,7 +47,7 @@ const SLOP_RULES: &[(&str, &[&str])] = &[
     (
         "formatting.md",
         &[
-            "formatting.bold_first_bullets",
+            "formatting.bold_first_leads",
             "formatting.em_dash_addiction",
             "formatting.signposted_conclusion",
         ],

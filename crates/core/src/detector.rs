@@ -21,7 +21,7 @@ use crate::suppression::Suppressions;
 /// rule id exists needs both, which [`Detector::rule_ids`] joins.
 pub const BUILTIN_RULE_IDS: &[&str] = &[
     char_class::UNICODE_DECORATION_RULE_ID,
-    markdown::BOLD_FIRST_BULLETS.0,
+    markdown::BOLD_FIRST_LEADS.0,
     repetition::CONTENT_DUPLICATION.0,
     repetition::DEAD_METAPHOR.0,
     repetition::ONE_POINT_DILUTION.0,

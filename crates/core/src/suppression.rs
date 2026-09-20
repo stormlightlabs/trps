@@ -170,7 +170,7 @@ mod tests {
     use super::*;
 
     /// A rule id no marker in these tests names.
-    const OTHER: &str = "formatting.bold_first_bullets";
+    const OTHER: &str = "formatting.bold_first_leads";
 
     #[test]
     fn text_without_markers_suppresses_nothing() {

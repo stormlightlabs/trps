@@ -3,28 +3,95 @@
 //! Every rule here comes from the Tropes.fyi list in `meta/tropes.md`.
 //! `meta/sources.md` carries the catalog and its license.
 
-/// Bullets opening with a bolded span.
-pub const BOLD_FIRST_BULLETS: (&str, &str) =
-    ("formatting.bold_first_bullets", "Bold-First Bullets");
+/// Bullets and paragraphs opening with a bolded span.
+pub const BOLD_FIRST_LEADS: (&str, &str) = ("formatting.bold_first_leads", "Bold-First Leads");
+
+/// Bolded leads in a row before the run is reported.
+///
+/// A writer reaches for one bolded lead, and sometimes for two. Three in a
+/// row is an opening filled in from a template, which is the trope.
+const BOLD_LEAD_THRESHOLD: usize = 3;
 
 use crate::patterns::Severity;
 
 use super::{Finding, Span};
 
 /// Finds markdown-specific trope signals.
+///
+/// A run of bolded leads is the signal, so a list and a sequence of
+/// paragraphs are read the same way. One finding covers one run, from the
+/// first lead to the last.
 pub fn scan_markdown(text: &str) -> Vec<Finding> {
-    line_spans(text)
-        .into_iter()
-        .filter(|line| starts_with_bold_list_item(&text[line.start()..line.end()]))
-        .map(|line| Finding::markdown(BOLD_FIRST_BULLETS, Severity::Medium, text, line))
-        .collect()
+    let mut findings = Vec::new();
+    let mut run = Vec::new();
+
+    for (block, opens_bold) in blocks(text) {
+        if opens_bold {
+            run.push(block);
+            continue;
+        }
+
+        findings.extend(report_run(text, &run));
+        run.clear();
+    }
+
+    findings.extend(report_run(text, &run));
+    findings
 }
 
-fn starts_with_bold_list_item(line: &str) -> bool {
-    match list_item_body(line.trim_start()) {
-        Some(after_marker) => starts_with_closed_bold(after_marker.trim_start()),
-        None => false,
+/// The finding a run of bolded leads reports, where the run is long enough.
+fn report_run(text: &str, run: &[Span]) -> Option<Finding> {
+    let (first, last) = (run.first()?, run.last()?);
+
+    (run.len() >= BOLD_LEAD_THRESHOLD).then(|| {
+        Finding::markdown(
+            BOLD_FIRST_LEADS,
+            Severity::Medium,
+            text,
+            Span(first.start(), last.end()),
+        )
+    })
+}
+
+/// Every block of `text` that can open with a bolded span, with whether it
+/// does.
+///
+/// A list item is one block, and so is a paragraph, because each carries a
+/// single lead. A wrapped line continues the block above it, so a bullet
+/// running over two lines is one lead and not a break in the run. A heading,
+/// a table row, and a block quote carry no lead and end the run they
+/// interrupt.
+///
+/// A blank line ends a block without ending a run. Paragraphs are separated
+/// by blank lines, and [`mask_non_prose`] has already blanked the fenced
+/// blocks, so a run holds across a sample sitting between two of its steps.
+fn blocks(text: &str) -> Vec<(Span, bool)> {
+    let mut blocks: Vec<(Span, bool)> = Vec::new();
+    let mut open = false;
+    let mut offset = 0;
+
+    for line in text.split_inclusive('\n') {
+        let span = Span(offset, offset + line.trim_end().len());
+        offset += line.len();
+
+        if line.trim().is_empty() {
+            open = false;
+        } else if let Some(body) = list_item_body(line.trim_start()) {
+            blocks.push((span, starts_with_closed_bold(body.trim_start())));
+            open = true;
+        } else if !is_prose_line(line) {
+            blocks.push((span, false));
+            open = false;
+        } else if open {
+            let block = blocks.last_mut().expect("an open block was pushed");
+            block.0 = Span(block.0.start(), span.end());
+        } else {
+            blocks.push((span, starts_with_closed_bold(line.trim_start())));
+            open = true;
+        }
     }
+
+    blocks
 }
 
 pub(crate) fn list_item_body(line: &str) -> Option<&str> {
@@ -166,29 +233,6 @@ fn front_matter_span(text: &str) -> Option<Span> {
     None
 }
 
-fn line_spans(text: &str) -> Vec<Span> {
-    let mut spans = Vec::new();
-    let mut start = 0;
-
-    for (index, character) in text.char_indices() {
-        if character == '\n' {
-            push_line_span(text, &mut spans, start, index);
-            start = index + character.len_utf8();
-        }
-    }
-
-    push_line_span(text, &mut spans, start, text.len());
-    spans
-}
-
-fn push_line_span(text: &str, spans: &mut Vec<Span>, start: usize, end: usize) {
-    let line = &text[start..end];
-    if !line.trim().is_empty() {
-        let trailing = line.len() - line.trim_end().len();
-        spans.push(Span(start, end - trailing));
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,28 +303,86 @@ mod tests {
     }
 
     #[test]
-    fn detects_unordered_bold_first_bullets() {
-        let findings = scan_markdown("- **Security**: Environment-based configuration");
+    fn detects_unordered_bold_first_leads() {
+        let findings = scan_markdown(
+            "- **Security**: keys read at startup\n- **Latency**: down by a third\n- **Cost**: flat",
+        );
 
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].rule_id, "formatting.bold_first_bullets");
+        assert_eq!(findings[0].rule_id, "formatting.bold_first_leads");
     }
 
     #[test]
-    fn detects_numbered_bold_first_bullets() {
-        let findings = scan_markdown("1. __Performance__: Lazy loading");
+    fn detects_numbered_bold_first_leads() {
+        let findings = scan_markdown(
+            "1. __Performance__: lazy loading\n2. __Security__: keys\n3. __Cost__: flat\n",
+        );
 
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].matched, "1. __Performance__: Lazy loading");
+        assert_eq!(
+            findings[0].matched,
+            "1. __Performance__: lazy loading\n2. __Security__: keys\n3. __Cost__: flat"
+        );
+    }
+
+    #[test]
+    fn detects_bold_first_paragraphs() {
+        let findings = scan_markdown(
+            "**Starting from nothing.** Run the thing.\n\n**Starting from an issue.** Run the other thing.\n\n**Not sure what to do.** Run triage.\n",
+        );
+
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule_id, "formatting.bold_first_leads");
+    }
+
+    #[test]
+    fn one_bolded_lead_is_emphasis_rather_than_a_template() {
+        assert!(scan_markdown("- **Security**: keys read at startup\n- Latency held.").is_empty());
+        assert!(
+            scan_markdown("**Security.** Keys are read at startup.\n\nLatency held.").is_empty()
+        );
+    }
+
+    #[test]
+    fn a_wrapped_bullet_does_not_end_a_run() {
+        let findings = scan_markdown(
+            "- **Security**: keys read at startup, which is\n  where the operator sets them\n- **Latency**: down\n- **Cost**: flat\n",
+        );
+
+        assert_eq!(findings.len(), 1);
+    }
+
+    #[test]
+    fn a_block_without_a_bolded_lead_ends_the_run() {
+        let findings = scan_markdown(
+            "**Security.** Keys are read at startup.\n\nThe rest of the config is read with it.\n\n**Latency.** It fell by a third.\n\n**Cost.** It held flat.\n",
+        );
+
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn a_heading_ends_the_run_it_interrupts() {
+        let findings = scan_markdown(
+            "**Security.** Keys are read at startup.\n\n**Latency.** It fell by a third.\n\n## Next quarter\n\n**Cost.** It holds flat.\n",
+        );
+
+        assert!(findings.is_empty());
     }
 
     #[test]
     fn ignores_bold_later_in_bullets() {
-        assert!(scan_markdown("- The **security** setting").is_empty());
+        let findings = scan_markdown(
+            "- The **security** setting\n- The **latency** budget\n- The **cost** ceiling",
+        );
+
+        assert!(findings.is_empty());
     }
 
     #[test]
     fn ignores_unclosed_bold() {
-        assert!(scan_markdown("- **Security: Environment").is_empty());
+        let findings = scan_markdown("- **Security: keys\n- **Latency: down\n- **Cost: flat");
+
+        assert!(findings.is_empty());
     }
 }
