@@ -34,6 +34,25 @@ lectito 'https://www.solo.io/blog/what-is-agent-identity-human-workload-a-new-la
     | cargo run -q -p trps-cli
 ```
 
+## What a scan reads
+
+A scan grades the prose of a file and skips the parts nobody wrote as prose:
+
+- Fenced code blocks, and everything between the fences. A block holds sample
+  output, a command, or a quoted defect, so grading it reports the quoted text
+  rather than the writing around it.
+- YAML front matter, delimiters included.
+
+The rules that count sentences next to each other read one paragraph at a
+time, and a heading, a table row, a block quote, and a list item are not part
+of one. Three bullets opening with the same two words are a list rather than
+anaphora, and a lead-in line above a list is not a run of fragments with the
+list under it.
+
+A sentence ends at a `.`, `!`, or `?` with whitespace or the end of the file
+after it. A terminator inside a token does not end one, so `src/lib.rs` and
+`v0.1.1` are read as single words.
+
 ## Exit codes
 
 The CLI exits `0` when it finds nothing and `1` when it reports a trope
