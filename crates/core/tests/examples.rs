@@ -4,6 +4,12 @@
 //! exactly the rule ids listed for it below, so a detector that starts or stops
 //! firing on real prose shows up as a failing test rather than as drift.
 //!
+//! A file in `false-positives/` is prose a careful writer would defend, which
+//! a rule reports anyway. The phrase matcher reads literal phrases and cannot
+//! see the reason a sentence goes on to give, so those findings are the price
+//! of the rule. Recording them here prices each rule and makes a change to one
+//! visible: narrowing a rule empties its entry, and widening one fills it.
+//!
 //! `rules.rs` holds one sample per pattern and fails when a pattern arrives
 //! with no test at all. These fixtures are prose where several rules meet, and
 //! fail when one of them changes what it reports beside the others.
@@ -132,6 +138,38 @@ const SLOP_RULES: &[(&str, &[&str])] = &[
     ),
 ];
 
+/// Rule ids each false-positive example is expected to produce.
+///
+/// Every entry is a finding on prose that says what it means. Treat a change
+/// here as a decision about the rule named, not as a test to correct.
+const FALSE_POSITIVE_RULES: &[(&str, &[&str])] = &[
+    (
+        "api-reference.md",
+        &[
+            "composition.throat_clearing",
+            "technical.anthropomorphism",
+            "technical.restates_code",
+            "technical.self_praise",
+        ],
+    ),
+    (
+        "field-guide.txt",
+        &["tone.promotional", "word_choice.lexical_spikes"],
+    ),
+    (
+        "postmortem.txt",
+        &[
+            "composition.restatement_markers",
+            "sentence_structure.impersonal_hedge",
+            "technical.vague_reasons",
+        ],
+    ),
+    (
+        "short-story.txt",
+        &["narrative.body_beats", "narrative.stock_imagery"],
+    ),
+];
+
 #[test]
 fn clean_examples_produce_no_findings() {
     for path in examples("clean") {
@@ -152,6 +190,21 @@ fn slop_examples_produce_the_listed_rules() {
             .iter()
             .find(|(fixture, _)| *fixture == name)
             .unwrap_or_else(|| panic!("{name} has no expected rules in SLOP_RULES"));
+
+        let expected: BTreeSet<String> = expected.1.iter().map(|id| (*id).to_owned()).collect();
+
+        assert_eq!(rule_ids(&path), expected, "unexpected rules for {name}");
+    }
+}
+
+#[test]
+fn false_positive_examples_report_the_listed_rules() {
+    for path in examples("false-positives") {
+        let name = path.file_name().and_then(|name| name.to_str()).unwrap();
+        let expected = FALSE_POSITIVE_RULES
+            .iter()
+            .find(|(fixture, _)| *fixture == name)
+            .unwrap_or_else(|| panic!("{name} has no expected rules in FALSE_POSITIVE_RULES"));
 
         let expected: BTreeSet<String> = expected.1.iter().map(|id| (*id).to_owned()).collect();
 
