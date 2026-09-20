@@ -2,6 +2,7 @@
 id = "tone.false_suspense"
 name = "Here's the Kicker"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "here's the kicker",
   "here's the thing",
@@ -15,6 +16,7 @@ phrases = [
 id = "tone.teacher_voice"
 name = "Let's Break This Down"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "let's break this down",
   "let's unpack",
@@ -26,6 +28,7 @@ phrases = [
 id = "tone.think_of_it_as"
 name = "Think of It As"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "think of it as",
   "think of it like",
@@ -36,6 +39,7 @@ phrases = [
 id = "tone.imagine_world"
 name = "Imagine a World Where"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "imagine a world where",
   "in that world",
@@ -45,6 +49,7 @@ phrases = [
 id = "tone.false_vulnerability"
 name = "False Vulnerability"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "and yes,",
   "since we're being honest",
@@ -56,6 +61,7 @@ phrases = [
 id = "tone.truth_is_simple"
 name = "The Truth Is Simple"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "the reality is simpler",
   "history is unambiguous",
@@ -69,6 +75,7 @@ phrases = [
 id = "tone.grandiose_stakes"
 name = "Grandiose Stakes Inflation"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "fundamentally reshape",
   "how we think about everything",
@@ -80,6 +87,7 @@ phrases = [
 id = "tone.vague_attributions"
 name = "Vague Attributions"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "experts argue",
   "industry reports suggest",
@@ -91,8 +99,43 @@ phrases = [
 id = "tone.invented_concept_labels"
 name = "Invented Concept Labels"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "supervision paradox",
   "acceleration trap",
   "workload creep",
+]
+
+[[patterns]]
+id = "tone.promotional"
+name = "Travel-Brochure Prose"
+severity = "medium"
+sources = ["clearmode", "humanizer"]
+phrases = [
+  "nestled",
+  "breathtaking",
+  "must-visit",
+  "must-read",
+  "renowned",
+  "stunning",
+  "boasts",
+  "vibrant",
+  "in the heart of",
+]
+
+[[patterns]]
+id = "tone.engagement_bait"
+name = "What Nobody Tells You"
+severity = "medium"
+sources = ["avoid-ai-writing"]
+phrases = [
+  "what if i told you",
+  "you might be wondering",
+  "what nobody tells you",
+  "nobody talks about",
+  "plot twist:",
+  "the catch?",
+  "the best part?",
+  "hot take",
+  "unpopular opinion",
 ]

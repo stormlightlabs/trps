@@ -9,6 +9,56 @@ use crate::errors::{PatternLoadError, PatternValidationError};
 /// File names a project dictionary is discovered under, in search order.
 pub const PROJECT_DICTIONARY_FILES: &[&str] = &["trps.toml", "tropes.toml", "tropius.toml"];
 
+/// A published catalog a bundled pattern takes its phrases from.
+///
+/// Every bundled pattern names one or more of these in its `sources` list, so
+/// a reader asking where a rule came from reads the answer beside the rule.
+/// `meta/sources.md` carries each catalog's license and copyright holder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Source {
+    /// Key a pattern cites, such as `tropes.fyi`.
+    pub key: &'static str,
+    /// Where the catalog is published.
+    pub url: &'static str,
+}
+
+/// Catalogs a bundled pattern may cite.
+pub const SOURCES: &[Source] = &[
+    Source {
+        key: "tropes.fyi",
+        url: "https://tropes.fyi",
+    },
+    Source {
+        key: "humanizer",
+        url: "https://github.com/blader/humanizer",
+    },
+    Source {
+        key: "avoid-ai-writing",
+        url: "https://github.com/conorbronsdon/avoid-ai-writing",
+    },
+    Source {
+        key: "clearmode",
+        url: "https://github.com/eugeniughelbur/clearmode",
+    },
+    Source {
+        key: "vale-llm-slop",
+        url: "https://github.com/Syntaf/vale-llm-slop",
+    },
+    Source {
+        key: "vale-ai-slop",
+        url: "https://github.com/stuffbucket/vale/tree/main/research/ai-slop",
+    },
+    Source {
+        key: "slop-forensics",
+        url: "https://github.com/sam-paech/slop-forensics",
+    },
+];
+
+/// Returns the catalog registered under `key`.
+pub fn source(key: &str) -> Option<&'static Source> {
+    SOURCES.iter().find(|source| source.key == key)
+}
+
 /// TOML files bundled into `tropius-core`.
 pub const BUNDLED_PATTERN_FILES: &[(&str, &str)] = &[
     ("formatting.toml", include_str!("patterns/formatting.toml")),
@@ -25,6 +75,15 @@ pub const BUNDLED_PATTERN_FILES: &[(&str, &str)] = &[
         "word-choice.toml",
         include_str!("patterns/word-choice.toml"),
     ),
+    (
+        "assistant-voice.toml",
+        include_str!("patterns/assistant-voice.toml"),
+    ),
+    (
+        "technical-prose.toml",
+        include_str!("patterns/technical-prose.toml"),
+    ),
+    ("narrative.toml", include_str!("patterns/narrative.toml")),
 ];
 
 /// Severity attached to a pattern or detector finding.
@@ -87,6 +146,13 @@ pub struct Pattern {
     pub name: String,
     /// Pattern severity.
     pub severity: Severity,
+    /// Catalogs the phrases came from, by [`Source::key`].
+    ///
+    /// A bundled pattern names at least one registered key, under
+    /// [`validate_sources`]. A project dictionary may cite whatever it likes,
+    /// including nothing.
+    #[serde(default)]
+    pub sources: Vec<String>,
     /// Literal phrases matched case-insensitively by the phrase detector.
     pub phrases: Vec<String>,
 }
@@ -100,6 +166,7 @@ pub fn bundled_patterns() -> Result<Vec<Pattern>, PatternLoadError> {
     }
 
     validate_patterns(&patterns)?;
+    validate_sources(&patterns)?;
 
     Ok(patterns)
 }
@@ -189,6 +256,33 @@ pub fn apply_dictionary(base: Vec<Pattern>, dictionary: &PatternFile) -> Vec<Pat
 
 fn normalize(phrase: &str) -> String {
     phrase.trim().to_ascii_lowercase()
+}
+
+/// Validates the citations on patterns bundled with the crate.
+///
+/// A bundled pattern has to say where its phrases came from, and has to say it
+/// in a key [`source`] resolves, so a citation cannot rot into a free-text
+/// note nobody can follow. Patterns a project dictionary declares are not
+/// checked: their citation, if any, belongs to that project.
+pub fn validate_sources(patterns: &[Pattern]) -> Result<(), PatternValidationError> {
+    for pattern in patterns {
+        if pattern.sources.is_empty() {
+            return Err(PatternValidationError::MissingSource {
+                id: pattern.id.clone(),
+            });
+        }
+
+        for key in &pattern.sources {
+            if source(key).is_none() {
+                return Err(PatternValidationError::UnknownSource {
+                    id: pattern.id.clone(),
+                    key: key.clone(),
+                });
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Validates pattern ids and phrases across all loaded pattern files.
@@ -298,18 +392,74 @@ phrases = ["delve into"]
     }
 
     #[test]
+    fn rejects_a_bundled_pattern_that_cites_nothing() {
+        let patterns = vec![Pattern {
+            id: "word_choice.delve".to_owned(),
+            name: "Delve".to_owned(),
+            severity: Severity::Medium,
+            sources: Vec::new(),
+            phrases: vec!["delve into".to_owned()],
+        }];
+
+        assert_eq!(
+            validate_sources(&patterns),
+            Err(PatternValidationError::MissingSource {
+                id: "word_choice.delve".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_a_bundled_pattern_that_cites_an_unregistered_source() {
+        let patterns = vec![Pattern {
+            id: "word_choice.delve".to_owned(),
+            name: "Delve".to_owned(),
+            severity: Severity::Medium,
+            sources: vec!["tropes.fyi".to_owned(), "a-blog-post".to_owned()],
+            phrases: vec!["delve into".to_owned()],
+        }];
+
+        assert_eq!(
+            validate_sources(&patterns),
+            Err(PatternValidationError::UnknownSource {
+                id: "word_choice.delve".to_owned(),
+                key: "a-blog-post".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn a_project_pattern_needs_no_citation() {
+        let dictionary = PatternFile::from_toml(
+            r#"
+[[patterns]]
+id = "project.bounded"
+name = "Bounded Without a Bound"
+severity = "high"
+phrases = ["bounded"]
+"#,
+        )
+        .unwrap();
+
+        assert!(dictionary.patterns[0].sources.is_empty());
+        assert!(validate_patterns(&dictionary.patterns).is_ok());
+    }
+
+    #[test]
     fn rejects_duplicate_pattern_ids() {
         let patterns = vec![
             Pattern {
                 id: "word_choice.delve".to_owned(),
                 name: "Delve".to_owned(),
                 severity: Severity::Medium,
+                sources: Vec::new(),
                 phrases: vec!["delve into".to_owned()],
             },
             Pattern {
                 id: "word_choice.delve".to_owned(),
                 name: "Delve Again".to_owned(),
                 severity: Severity::Medium,
+                sources: Vec::new(),
                 phrases: vec!["delving deeper".to_owned()],
             },
         ];
@@ -329,12 +479,14 @@ phrases = ["delve into"]
                 id: "one".to_owned(),
                 name: "One".to_owned(),
                 severity: Severity::Medium,
+                sources: Vec::new(),
                 phrases: vec!["Delve Into".to_owned()],
             },
             Pattern {
                 id: "two".to_owned(),
                 name: "Two".to_owned(),
                 severity: Severity::Medium,
+                sources: Vec::new(),
                 phrases: vec!["delve into".to_owned()],
             },
         ];
@@ -353,6 +505,7 @@ phrases = ["delve into"]
             id: " ".to_owned(),
             name: "Empty".to_owned(),
             severity: Severity::Medium,
+            sources: Vec::new(),
             phrases: vec!["delve into".to_owned()],
         }];
 
@@ -368,6 +521,7 @@ phrases = ["delve into"]
             id: "word_choice.delve".to_owned(),
             name: " ".to_owned(),
             severity: Severity::Medium,
+            sources: Vec::new(),
             phrases: vec!["delve into".to_owned()],
         }];
 
@@ -385,6 +539,7 @@ phrases = ["delve into"]
             id: "word_choice.delve".to_owned(),
             name: "Delve".to_owned(),
             severity: Severity::Medium,
+            sources: Vec::new(),
             phrases: Vec::new(),
         }];
 
@@ -402,6 +557,7 @@ phrases = ["delve into"]
             id: "word_choice.delve".to_owned(),
             name: "Delve".to_owned(),
             severity: Severity::Medium,
+            sources: Vec::new(),
             phrases: vec![" ".to_owned()],
         }];
 
@@ -444,6 +600,7 @@ phrases = ["delve into"]
             id: "word_choice.delve".to_owned(),
             name: "Delve".to_owned(),
             severity: Severity::Medium,
+            sources: Vec::new(),
             phrases: vec!["harness".to_owned()],
         }];
         let dictionary = PatternFile::from_toml(r#"allow = ["harness"]"#).unwrap();

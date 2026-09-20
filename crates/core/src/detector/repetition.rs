@@ -1,4 +1,7 @@
 //! Repetition detectors for document-level trope signals.
+//!
+//! Every rule here comes from the Tropes.fyi list in `meta/tropes.md`.
+//! `meta/sources.md` carries the catalog and its license.
 
 /// A metaphor term repeated until it stops meaning anything.
 pub const DEAD_METAPHOR: (&str, &str) = ("composition.dead_metaphor", "The Dead Metaphor");

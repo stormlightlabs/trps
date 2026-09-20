@@ -1,0 +1,8 @@
+Note that the migration could potentially take a week. It could be argued
+that nobody has measured it.
+
+In other words, the estimate is a guess. To be fair, more often than not the
+copy step is the slow one, and in many ways the index rebuild is worse.
+
+Keep in mind that it is possible that the rebuild runs twice. Simply put, we
+do not know yet.

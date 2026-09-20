@@ -74,6 +74,20 @@ pub enum PatternValidationError {
         /// The duplicate pattern id.
         id: String,
     },
+    /// A bundled pattern names no source.
+    #[error("pattern `{id}` must cite at least one source")]
+    MissingSource {
+        /// The id of the uncited pattern.
+        id: String,
+    },
+    /// A bundled pattern cites a source the crate does not register.
+    #[error("pattern `{id}` cites unknown source `{key}`")]
+    UnknownSource {
+        /// The id of the pattern carrying the citation.
+        id: String,
+        /// The unregistered key it cited.
+        key: String,
+    },
     /// Two pattern entries use the same phrase after ASCII case folding.
     #[error("duplicate phrase `{phrase}`")]
     DuplicatePhrase {

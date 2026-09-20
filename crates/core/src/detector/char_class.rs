@@ -1,4 +1,7 @@
 //! Character-class detectors that do not need Aho-Corasick.
+//!
+//! Every rule here comes from the Tropes.fyi list in `meta/tropes.md`.
+//! `meta/sources.md` carries the catalog and its license.
 
 use crate::patterns::Severity;
 

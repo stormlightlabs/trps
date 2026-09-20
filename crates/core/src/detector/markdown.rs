@@ -1,4 +1,7 @@
 //! Markdown-aware detectors for formatting tropes.
+//!
+//! Every rule here comes from the Tropes.fyi list in `meta/tropes.md`.
+//! `meta/sources.md` carries the catalog and its license.
 
 /// Bullets opening with a bolded span.
 pub const BOLD_FIRST_BULLETS: (&str, &str) =

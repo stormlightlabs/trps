@@ -2,6 +2,7 @@
 id = "word_choice.magic_adverbs"
 name = "Quietly and Other Magic Adverbs"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "quietly",
   "deeply",
@@ -14,6 +15,7 @@ phrases = [
 id = "word_choice.delve"
 name = "Delve and Friends"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "delve into",
   "delving deeper",
@@ -29,6 +31,7 @@ phrases = [
 id = "word_choice.grandiose_nouns"
 name = "Tapestry and Landscape"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "tapestry",
   "landscape",
@@ -42,9 +45,32 @@ phrases = [
 id = "word_choice.serves_as"
 name = "The Serves As Dodge"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   "serves as",
   "stands as",
   "marks a pivotal",
   "represents",
+]
+
+[[patterns]]
+id = "word_choice.lexical_spikes"
+name = "Post-2022 Lexical Spikes"
+severity = "medium"
+sources = ["vale-ai-slop", "clearmode"]
+phrases = [
+  "meticulous",
+  "elucidate",
+  "commendable",
+  "unparalleled",
+  "multifaceted",
+  "groundbreaking",
+  "seamlessly",
+  "intricate",
+  "testament",
+  "burgeoning",
+  "plethora",
+  "myriad",
+  "realm of",
+  "pivotal moment",
 ]

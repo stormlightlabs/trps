@@ -1,4 +1,7 @@
 //! Structural detectors for trope signals that are not literal phrase matches.
+//!
+//! Every rule here comes from the Tropes.fyi list in `meta/tropes.md`.
+//! `meta/sources.md` carries the catalog and its license.
 
 /// Three sentences opening with the same words.
 pub const ANAPHORA_ABUSE: (&str, &str) = ("sentence_structure.anaphora_abuse", "Anaphora Abuse");

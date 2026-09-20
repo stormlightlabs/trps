@@ -2,6 +2,7 @@
 id = "formatting.em_dash_addiction"
 name = "Em-Dash Addiction"
 severity = "medium"
+sources = ["tropes.fyi"]
 phrases = [
   " -- ",
 ]
@@ -10,6 +11,7 @@ phrases = [
 id = "formatting.signposted_conclusion"
 name = "The Signposted Conclusion"
 severity = "low"
+sources = ["tropes.fyi"]
 phrases = [
   "in conclusion",
   "to sum up",
