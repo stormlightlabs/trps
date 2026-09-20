@@ -31,3 +31,7 @@ Run it against a file to see the shape of the report:
 A key the loader does not know is an error rather than a warning, because a
 misspelled key the loader drops without a word reads as a setting that had
 no effect.
+
+**Severity** is the one key with a default. A run that sets nothing prints
+every finding, since a report hiding its own low findings would read as a
+file with none.

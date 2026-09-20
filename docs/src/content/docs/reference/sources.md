@@ -20,7 +20,7 @@ phrases = ["in today's fast-paced", "in the age of"]
 So a rule you want to argue with can be traced to whoever proposed it. A key
 `trps-core` does not register fails the load, and the seven registered keys
 are the sections below. Rules written in Rust instead of TOML, covering
-sentence and paragraph shape, repetition, bold-first bullets, and Unicode
+sentence and paragraph shape, repetition, bold-first leads, and Unicode
 decoration, all come from Tropes.fyi.
 
 ## tropes.fyi
