@@ -5,9 +5,10 @@
 ## How
 
 We use a pattern dictionary in TOML, drawn from the published trope catalogs
-listed in [`sources.md`](./meta/sources.md). Every pattern names the catalogs
-its phrases came from, and a bundled pattern that cites one the crate does not
-know fails to load.
+the [Sources](https://trps.stormlightlabs.org/reference/sources/) page
+describes. Every pattern names the catalogs its phrases came from, and a
+bundled pattern that cites one the crate does not know fails to load.
+[`meta/sources.md`](./meta/sources.md) holds their copyright notices.
 
 ```text
 Text
@@ -26,8 +27,8 @@ printf 'Let us delve into this robust ecosystem.' | cargo run -q -p tropius-cli
 ```
 
 See [`docs/src/content/docs/reference/`](./docs/src/content/docs/reference/)
-for the rest: scanning files, the JSON report, the project dictionary, and the
-ignore markers.
+for the rest: scanning files, the JSON report, the project dictionary, the
+ignore markers, and where the rules come from.
 
 ## Coverage
 

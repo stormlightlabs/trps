@@ -8,7 +8,7 @@ that mark text as machine-written. This site is its usage documentation; the
 [README](https://github.com/stormlightlabs/trps) says what the tool is and how
 it works.
 
-Four pages:
+Five pages:
 
 - [Usage](/reference/usage/) scans stdin, files, and an article pulled from a
   URL, and says what the exit codes mean.
@@ -18,3 +18,5 @@ Four pages:
   patterns for one repository and keeps paths out of a scan.
 - [Suppressing a finding in place](/reference/suppressing-findings/) marks a
   span to leave alone and records why.
+- [Sources](/reference/sources/) names the published catalogs the rules come
+  from and what each one contributed.
