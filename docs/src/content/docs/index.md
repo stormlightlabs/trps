@@ -3,7 +3,7 @@ title: tropius
 description: A CLI that detects AI tropes in prose.
 ---
 
-`tropius` reads prose and reports the phrases, rhythms, and punctuation habits
+Tropius reads prose and reports the phrases, rhythms, and punctuation habits
 that mark text as machine-written. This site is its usage documentation; the
 [README](https://github.com/stormlightlabs/trps) says what the tool is and how
 it works.

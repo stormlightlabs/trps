@@ -1,6 +1,6 @@
 # tropius
 
-`tropius` is a CLI to detect AI tropes in prose.
+Tropius (`trps`) is a CLI to detect AI tropes in prose.
 
 ## How
 
@@ -23,7 +23,7 @@ Findings report
 ## Quick start
 
 ```sh
-printf 'Let us delve into this robust ecosystem.' | cargo run -q -p tropius-cli
+printf 'Let us delve into this robust ecosystem.' | cargo run -q -p trps-cli
 ```
 
 See [`docs/src/content/docs/reference/`](./docs/src/content/docs/reference/)

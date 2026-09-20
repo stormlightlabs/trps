@@ -1,3 +1,11 @@
 [workspace]
 resolver = "2"
 members = ["crates/cli","crates/core"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Unlicense"
+repository = "https://github.com/stormlightlabs/trps"
+homepage = "https://trps.stormlightlabs.org"
+keywords = ["linter", "prose", "writing", "ai", "text"]

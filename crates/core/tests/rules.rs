@@ -6,8 +6,8 @@
 
 use std::collections::BTreeSet;
 
-use tropius_core::detector::Detector;
-use tropius_core::patterns::{SOURCES, bundled_patterns};
+use trps_core::detector::Detector;
+use trps_core::patterns::{SOURCES, bundled_patterns};
 
 /// Prose each bundled pattern has to report.
 ///
