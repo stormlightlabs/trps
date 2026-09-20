@@ -13,7 +13,7 @@ phrases = [
 [[patterns]]
 id = "composition.throat_clearing"
 name = "Throat-Clearing Frames"
-severity = "medium"
+severity = "low"
 sources = ["vale-llm-slop"]
 phrases = [
   "note that",

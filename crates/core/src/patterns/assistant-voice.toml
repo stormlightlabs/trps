@@ -23,7 +23,7 @@ phrases = [
 [[patterns]]
 id = "assistant.process_narration"
 name = "Narrating the Next Step"
-severity = "medium"
+severity = "low"
 sources = ["vale-llm-slop"]
 phrases = [
   "let me check",

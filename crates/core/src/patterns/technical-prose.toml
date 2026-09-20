@@ -31,6 +31,9 @@ phrases = [
   "is happy to",
 ]
 
+# Graded one step below the vale-llm-slop rule it comes from, which is a
+# warning. `helper function` and `return the result` are ordinary in a
+# reference page, as meta/examples/false-positives/api-reference.md shows.
 [[patterns]]
 id = "technical.restates_code"
 name = "Prose That Restates the Code"
