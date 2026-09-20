@@ -24,6 +24,8 @@ const REASON_SEPARATOR: &str = "--";
 #[derive(Debug)]
 struct Region {
     span: Range<usize>,
+    /// Offset of the line the marker was written on.
+    marker: usize,
     /// Rule ids the region suppresses, or empty for every rule.
     rules: Vec<String>,
 }
@@ -73,15 +75,16 @@ impl Suppressions {
     pub fn new(text: &str) -> Self {
         let mut regions = Vec::new();
         let mut open: Option<(usize, Vec<String>)> = None;
-        let mut next_line: Option<Vec<String>> = None;
+        let mut next_line: Option<(usize, Vec<String>)> = None;
         let mut offset = 0;
 
         for line in text.split_inclusive('\n') {
             let end = offset + line.len();
 
-            if let Some(rules) = next_line.take() {
+            if let Some((marker, rules)) = next_line.take() {
                 regions.push(Region {
                     span: offset..end,
+                    marker,
                     rules,
                 });
             }
@@ -90,13 +93,14 @@ impl Suppressions {
                 if let Some((start, rules)) = open.take() {
                     regions.push(Region {
                         span: start..end,
+                        marker: start,
                         rules,
                     });
                 }
             } else if line.contains(START_MARKER) {
                 open.get_or_insert_with(|| (offset, rules_after(line, START_MARKER)));
             } else if line.contains(NEXT_LINE_MARKER) {
-                next_line = Some(rules_after(line, NEXT_LINE_MARKER));
+                next_line = Some((offset, rules_after(line, NEXT_LINE_MARKER)));
             }
 
             offset = end;
@@ -105,11 +109,34 @@ impl Suppressions {
         if let Some((start, rules)) = open {
             regions.push(Region {
                 span: start..text.len(),
+                marker: start,
                 rules,
             });
         }
 
         Self { regions }
+    }
+
+    /// The rule ids named by markers that no id in `known` answers to, each
+    /// with the offset of the line its marker was written on.
+    ///
+    /// A marker naming a rule nothing reports suppresses nothing and says so
+    /// nowhere, which is how a typo survives a review. Returned in the order
+    /// the markers wrote them.
+    pub fn unknown_rules<'a>(
+        &self,
+        known: impl Iterator<Item = &'a str> + Clone,
+    ) -> Vec<(&str, usize)> {
+        self.regions
+            .iter()
+            .flat_map(|region| {
+                region
+                    .rules
+                    .iter()
+                    .map(|rule| (rule.as_str(), region.marker))
+            })
+            .filter(|(rule, _)| !known.clone().any(|id| names(rule, id)))
+            .collect()
     }
 
     /// Reports whether a finding for `rule_id` starting at `offset` was
@@ -270,6 +297,29 @@ mod tests {
         let suppressions = Suppressions::new(text);
 
         assert!(!suppressions.covers(text.find("one").unwrap(), "word_choice.delve"));
+    }
+
+    #[test]
+    fn a_rule_no_id_answers_to_is_reported_at_its_marker() {
+        let text = "one\ntrps-ignore-next-line word_choise, word_choice.delve\ntwo\n";
+        let known = ["word_choice.delve", "formatting.em_dash_addiction"];
+
+        assert_eq!(
+            Suppressions::new(text).unknown_rules(known.into_iter()),
+            [("word_choise", text.find("trps-ignore").unwrap())]
+        );
+    }
+
+    #[test]
+    fn a_namespace_answered_by_one_rule_is_known() {
+        let text = "trps-ignore-next-line word_choice\nx\n";
+        let known = ["word_choice.delve"];
+
+        assert!(
+            Suppressions::new(text)
+                .unknown_rules(known.into_iter())
+                .is_empty()
+        );
     }
 
     #[test]

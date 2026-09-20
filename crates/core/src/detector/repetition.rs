@@ -1,5 +1,16 @@
 //! Repetition detectors for document-level trope signals.
 
+/// A metaphor term repeated until it stops meaning anything.
+pub const DEAD_METAPHOR: (&str, &str) = ("composition.dead_metaphor", "The Dead Metaphor");
+
+/// One point stretched across a document.
+pub const ONE_POINT_DILUTION: (&str, &str) =
+    ("composition.one_point_dilution", "One-Point Dilution");
+
+/// A paragraph or sentence repeated verbatim.
+pub const CONTENT_DUPLICATION: (&str, &str) =
+    ("composition.content_duplication", "Content Duplication");
+
 use std::collections::HashMap;
 
 use crate::patterns::Severity;
@@ -56,7 +67,7 @@ fn scan_dead_metaphor(text: &str) -> Vec<Finding> {
         .filter(|spans| spans.len() >= 5)
         .map(|spans| {
             Finding::repetition(
-                ("composition.dead_metaphor", "The Dead Metaphor"),
+                DEAD_METAPHOR,
                 Severity::Medium,
                 text,
                 super::Span(spans[0].start(), spans[spans.len() - 1].end()),
@@ -85,7 +96,7 @@ fn scan_one_point_dilution(text: &str, paragraphs: &[super::Span]) -> Vec<Findin
         })
         .map(|window| {
             Finding::repetition(
-                ("composition.one_point_dilution", "One-Point Dilution"),
+                ONE_POINT_DILUTION,
                 Severity::Medium,
                 text,
                 super::Span(window[0].0.start(), window[2].0.end()),
@@ -99,18 +110,12 @@ fn scan_content_duplication(
     paragraphs: &[super::Span],
     sentences: &[super::Span],
 ) -> Vec<Finding> {
-    let mut findings = duplicate_normalized_spans(
-        text,
-        paragraphs,
-        "composition.content_duplication",
-        "Content Duplication",
-    );
+    let mut findings = duplicate_normalized_spans(text, paragraphs, CONTENT_DUPLICATION);
 
     findings.extend(duplicate_normalized_spans(
         text,
         sentences,
-        "composition.content_duplication",
-        "Content Duplication",
+        CONTENT_DUPLICATION,
     ));
 
     findings
@@ -119,8 +124,7 @@ fn scan_content_duplication(
 fn duplicate_normalized_spans(
     text: &str,
     spans: &[super::Span],
-    rule_id: &str,
-    rule_name: &str,
+    rule: (&str, &str),
 ) -> Vec<Finding> {
     let mut seen: HashMap<String, super::Span> = HashMap::new();
     let mut findings = Vec::new();
@@ -140,7 +144,7 @@ fn duplicate_normalized_spans(
 
         if let Some(previous) = seen.get(&normalized) {
             findings.push(Finding::repetition(
-                (rule_id, rule_name),
+                rule,
                 Severity::High,
                 text,
                 super::Span(previous.start(), span.end()),

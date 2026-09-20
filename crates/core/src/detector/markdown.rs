@@ -1,5 +1,9 @@
 //! Markdown-aware detectors for formatting tropes.
 
+/// Bullets opening with a bolded span.
+pub const BOLD_FIRST_BULLETS: (&str, &str) =
+    ("formatting.bold_first_bullets", "Bold-First Bullets");
+
 use crate::patterns::Severity;
 
 use super::{Finding, Span};
@@ -9,14 +13,7 @@ pub fn scan_markdown(text: &str) -> Vec<Finding> {
     line_spans(text)
         .into_iter()
         .filter(|line| starts_with_bold_list_item(&text[line.start()..line.end()]))
-        .map(|line| {
-            Finding::markdown(
-                ("formatting.bold_first_bullets", "Bold-First Bullets"),
-                Severity::Medium,
-                text,
-                line,
-            )
-        })
+        .map(|line| Finding::markdown(BOLD_FIRST_BULLETS, Severity::Medium, text, line))
         .collect()
 }
 

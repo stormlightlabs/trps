@@ -499,6 +499,58 @@ fn a_marker_naming_a_rule_keeps_the_other_findings() {
     );
 }
 
+#[test]
+fn a_marker_naming_no_rule_warns_without_failing_the_run() {
+    let known = scan(
+        None,
+        "<!-- trps-ignore-next-line word_choice.delve -->\nLet us delve into this.\n",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(known.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&known.stderr), "");
+
+    let typo = scan(
+        None,
+        "<!-- trps-ignore-next-line word_choise -->\nLet us delve into this.\n",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(typo.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8_lossy(&typo.stderr),
+        "warning: 1:1 no rule is named `word_choise`\n"
+    );
+    assert!(stdout(&typo).contains("word_choice.delve"));
+}
+
+#[test]
+fn a_warning_names_its_file_and_leaves_the_json_alone() {
+    let directory = case_dir("unknown-rule-warning");
+    write(
+        &directory,
+        "input.md",
+        "<!-- trps-ignore-start word_choise -->\nLet us delve into this.\n",
+    );
+
+    let output = run(
+        Some(&directory),
+        &["--json", "input.md"],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        "warning: input.md:1:1 no rule is named `word_choise`\n"
+    );
+
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&output)).expect("the report is JSON");
+
+    assert_eq!(report["findings"][0]["rule_id"], "word_choice.delve");
+}
+
 fn example(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../meta/examples")

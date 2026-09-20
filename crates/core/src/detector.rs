@@ -14,6 +14,25 @@ use crate::patterns::{Pattern, Severity};
 use crate::patterns::{bundled_patterns, validate_patterns};
 use crate::suppression::Suppressions;
 
+/// Rule ids the detectors compiled into this crate can report.
+///
+/// The phrase rules come out of the loaded dictionaries, so [`Detector`] holds
+/// those; these have no dictionary entry to read. Anything asking whether a
+/// rule id exists needs both, which [`Detector::rule_ids`] joins.
+pub const BUILTIN_RULE_IDS: &[&str] = &[
+    char_class::UNICODE_DECORATION_RULE_ID,
+    markdown::BOLD_FIRST_BULLETS.0,
+    repetition::CONTENT_DUPLICATION.0,
+    repetition::DEAD_METAPHOR.0,
+    repetition::ONE_POINT_DILUTION.0,
+    structural::ANAPHORA_ABUSE.0,
+    structural::FRACTAL_SUMMARIES.0,
+    structural::HISTORICAL_ANALOGY_STACKING.0,
+    structural::LISTICLE_IN_TRENCH_COAT.0,
+    structural::SHORT_PUNCHY_FRAGMENTS.0,
+    structural::TRICOLON_ABUSE.0,
+];
+
 /// Finds trope signals in prose.
 #[derive(Debug)]
 pub struct Detector {
@@ -52,6 +71,14 @@ impl Detector {
             phrase_to_pattern,
             phrase_matcher,
         })
+    }
+
+    /// Every rule id this detector can report.
+    pub fn rule_ids(&self) -> impl Iterator<Item = &str> + Clone {
+        self.phrase_patterns
+            .iter()
+            .map(|pattern| pattern.id.as_str())
+            .chain(BUILTIN_RULE_IDS.iter().copied())
     }
 
     /// Scans text with all enabled detectors.

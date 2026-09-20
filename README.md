@@ -202,6 +202,10 @@ An id names the rule it spells, or every rule beneath it when it stops at a
 dot: `word_choice` covers `word_choice.delve` and `word_choice.magic_adverbs`,
 and `word` covers neither.
 
+An id no rule answers to suppresses nothing, so the CLI warns on stderr and
+names the line the marker is on. The warning leaves the exit code alone, and
+leaves `--json` writing one document to stdout.
+
 A `--` ends the list, so the note saying why the span was kept can sit beside
 the marker:
 

@@ -16,6 +16,7 @@ use tropius_core::{
     patterns::{
         Severity, apply_dictionary, bundled_patterns, find_project_dictionary, load_pattern_file,
     },
+    suppression::Suppressions,
 };
 
 /// Name the JSON report gives to text read from stdin.
@@ -106,6 +107,8 @@ fn run(args: Args) -> Result<bool, String> {
             (source, findings)
         })
         .collect();
+
+    warn_unknown_rules(&scanned, &rules.detector);
 
     match args.json {
         true => print_json(&scanned, rules.dictionary)?,
@@ -219,6 +222,26 @@ fn print_json(
     Ok(())
 }
 
+/// Warns about a marker naming a rule nothing reports, which suppresses
+/// nothing and would otherwise fail in silence.
+///
+/// Warnings go to stderr, so a `--json` run still writes one document to
+/// stdout, and they do not change the exit code: a typo in a marker is worth
+/// saying and not worth failing a build over.
+fn warn_unknown_rules(scanned: &[(Source, Vec<Finding>)], detector: &Detector) {
+    for (source, _) in scanned {
+        let index = LineIndex::new(&source.text);
+
+        for (rule, offset) in Suppressions::new(&source.text).unknown_rules(detector.rule_ids()) {
+            eprintln!(
+                "{} {} no rule is named `{rule}`",
+                "warning:".if_supports_color(Stream::Stderr, |text| text.yellow()),
+                in_file(&source.name, index.locate(offset).to_string()),
+            );
+        }
+    }
+}
+
 /// Prints the decorated report. Every finding names its own place, so a run
 /// over several paths needs no heading to say which file it is reading.
 fn print_report(scanned: &[(Source, Vec<Finding>)]) {
@@ -260,9 +283,15 @@ fn origin(name: &str, (start, end): (Location, Location)) -> String {
         false => format!("{start}-{end}"),
     };
 
+    in_file(name, range)
+}
+
+/// Prefixes a place in a file with the file, dropping the path for stdin,
+/// which has none.
+fn in_file(name: &str, place: String) -> String {
     match name == STDIN_NAME {
-        true => range,
-        false => format!("{name}:{range}"),
+        true => place,
+        false => format!("{name}:{place}"),
     }
 }
 
