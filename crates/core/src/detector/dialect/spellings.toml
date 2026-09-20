@@ -1,11 +1,11 @@
 # Words American and British English spell differently.
 #
-# The rule reads a pair in both directions, so a pair is listed only when
-# each form is unambiguous on both sides. That keeps out `program`, which
-# British English also uses for software; `license` and `practice`, which
-# American English spells one way for both the noun and the verb; `meter`,
-# which is the instrument either side of the Atlantic; and `analyses`, which
-# is a plural noun in American English as well as a British verb.
+# The rule reads a pair in both directions, so a pair is listed only where
+# both forms are unambiguous. British English uses `program` for software,
+# and American English spells `license` and `practice` one way for both the
+# noun and the verb. `meter` is the instrument on both sides, and `analyses`
+# is an American plural noun as well as a British verb. None of the four is
+# listed.
 #
 # Nothing here stems a word. An inflection is an entry of its own, and a word
 # with no entry is not reported.

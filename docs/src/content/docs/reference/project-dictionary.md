@@ -93,13 +93,13 @@ you wrote it:
 The word list covers the `-or`/`-our`, `-ize`/`-ise`, `-er`/`-re` and
 `-se`/`-ce` families, the doubled consonants of `travelled` and `enrolment`,
 and the irregulars that follow no pattern. Nothing is stemmed: `colours` is
-reported because it is listed, and a word with no entry is not reported at all.
+reported because it is listed, and a word with no entry is not reported.
 
 A pair is listed only where both spellings are unambiguous, since the rule
-reads them in both directions. `program`, which British English also uses for
-software, and `license` and `practice`, which American English spells one way
-for both the noun and the verb, are left out rather than reported wrongly.
-British here means the `-ise` convention, not the `-ize` one Oxford keeps.
+reads them in both directions. British English uses `program` for software,
+and American English spells `license` and `practice` one way for both the noun
+and the verb, so none of the three is listed. British here is the `-ise`
+convention rather than the `-ize` spelling Oxford keeps.
 
 Spelling inside a fenced block or front matter is never graded, and a single
 finding can be suppressed the way any other is. [Suppressing

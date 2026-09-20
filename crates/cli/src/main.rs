@@ -74,7 +74,7 @@ struct ReportFinding<'a> {
     line: usize,
     column: usize,
     matched: &'a str,
-    /// The spelling the project's dialect uses, on the one rule that knows.
+    /// The spelling the project's dialect uses, on the dialect rule alone.
     #[serde(skip_serializing_if = "Option::is_none")]
     expected: Option<&'a str>,
 }
@@ -284,8 +284,8 @@ fn print_finding(finding: &Finding, name: &str, index: &LineIndex) {
     println!("  └─ {}", matched_text(finding));
 }
 
-/// Renders what a finding matched, and the spelling it expected where the
-/// rule carries one, so a dialect fix needs no lookup.
+/// Renders what a finding matched, and the form it expected where the rule
+/// carries one, so a dialect fix needs no lookup.
 fn matched_text(finding: &Finding) -> String {
     let matched = indented_match(&finding.matched)
         .if_supports_color(Stream::Stdout, |text| text.yellow())

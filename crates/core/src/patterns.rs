@@ -122,12 +122,11 @@ pub struct PatternFile {
     /// case-insensitively.
     #[serde(default)]
     pub allow: Vec<String>,
-    /// The English dialect the project writes in.
+    /// The English dialect the project writes in, where it names one.
     ///
     /// Naming one turns on `word_choice.dialect_spelling`, which reports
-    /// every spelling from the other dialect against the form this one uses.
-    /// The rule is off while this is unset: a dictionary that picked a
-    /// dialect for the project would rewrite half of it unasked.
+    /// every spelling the other dialect uses. The rule is off while this is
+    /// unset; [`crate::detector::dialect`] says why it has no default.
     #[serde(default)]
     pub dialect: Option<Dialect>,
     /// Globs naming paths no scan reads, relative to the directory holding

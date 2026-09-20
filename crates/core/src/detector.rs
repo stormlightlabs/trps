@@ -78,8 +78,8 @@ impl Detector {
         })
     }
 
-    /// Turns on the dialect rule, which is off until a project names the
-    /// dialect it writes in.
+    /// Turns on the dialect rule, which [`Detector::new`] leaves off. See
+    /// [`dialect`] for why it has no default.
     pub fn with_dialect(mut self, dialect: Dialect) -> Result<Self, DetectorBuildError> {
         self.dialect = Some(DialectRule::new(dialect)?);
 
@@ -157,10 +157,9 @@ pub struct Finding {
     /// occurrences themselves: `formatting.unicode_decoration` reports
     /// `— — —` rather than the text between the first dash and the last.
     pub matched: String,
-    /// What the rule expected in place of `matched`, where the rule knows:
-    /// `word_choice.dialect_spelling` reports the spelling the project's
-    /// dialect uses. Every other rule reports what it found and leaves the
-    /// rewrite to the writer.
+    /// The form the rule expected in place of `matched`.
+    /// `word_choice.dialect_spelling` names the spelling the project's
+    /// dialect uses; no other rule sets this.
     pub expected: Option<String>,
     /// Start & end byte offset.
     pub span: Span,

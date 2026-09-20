@@ -1,9 +1,8 @@
 //! Spelling that does not match the dialect a project writes in.
 //!
-//! The rule is off until a project dictionary names a dialect. A corpus has
-//! to pick a side before anything can call `colour` wrong, and a tool that
-//! picked for it would rewrite a British project into American English
-//! without being asked.
+//! The rule is off until a project dictionary names a dialect, because
+//! neither spelling is wrong until a project has chosen one. A default would
+//! report half of a British corpus.
 
 /// A word spelled against the dialect the project writes in.
 pub const DIALECT_SPELLING: (&str, &str) = ("word_choice.dialect_spelling", "Dialect Spelling");
@@ -15,14 +14,13 @@ use crate::patterns::Severity;
 
 use super::{Finding, FindingKind, Span};
 
-/// The word pairs bundled with the crate.
+/// The word-pair file bundled with the crate.
 const BUNDLED_SPELLINGS: &str = include_str!("dialect/spellings.toml");
 
 /// The English dialect a project writes in.
 ///
-/// `British` means the `-ise` convention rather than the `-ize` one Oxford
-/// keeps, because that is the convention a project choosing British English
-/// over American English is choosing between.
+/// `British` is the `-ise` convention rather than the `-ize` spelling Oxford
+/// keeps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Dialect {
@@ -50,7 +48,7 @@ impl Spelling {
         }
     }
 
-    /// The form a project writing `dialect` is reported for.
+    /// The form the other dialect uses, which is what the rule reports.
     fn reported(&self, dialect: Dialect) -> &str {
         self.expected(dialect.other())
     }
@@ -65,23 +63,24 @@ impl Dialect {
     }
 }
 
-/// The bundled word pairs, in the order the file lists them.
+/// The word pairs as `spellings.toml` holds them.
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SpellingFile {
     words: Vec<Spelling>,
 }
 
-/// Reads the word pairs bundled with the crate.
+/// Reads the bundled word pairs.
 pub fn bundled_spellings() -> Result<Vec<Spelling>, PatternLoadError> {
     Ok(toml::from_str::<SpellingFile>(BUNDLED_SPELLINGS)?.words)
 }
 
-/// The dialect rule, compiled over the spellings one dialect does not use.
+/// The dialect rule, compiled over the forms the chosen dialect does not
+/// use.
 #[derive(Debug)]
 pub struct DialectRule {
     matcher: AhoCorasick,
-    /// The form to report, parallel to the matcher's patterns.
+    /// The expected form for each of the matcher's patterns, in that order.
     expected: Vec<String>,
 }
 
@@ -93,8 +92,8 @@ impl DialectRule {
 
     /// Compiles the rule for `dialect` over `spellings`.
     ///
-    /// The longest match at an offset wins, so `colourful` reports itself
-    /// rather than losing its first six letters to `colour`.
+    /// The longest match at an offset wins, so `colourful` matches as itself
+    /// rather than as the `colour` inside it.
     pub fn from_spellings(
         dialect: Dialect,
         spellings: &[Spelling],
@@ -113,7 +112,7 @@ impl DialectRule {
         })
     }
 
-    /// Reports every whole word in `text` the dialect does not spell that way.
+    /// Reports every whole word in `text` that `dialect` spells differently.
     pub fn scan(&self, text: &str) -> Vec<Finding> {
         self.matcher
             .find_iter(text)
@@ -127,7 +126,7 @@ impl DialectRule {
                     severity: Severity::Medium,
                     kind: FindingKind::Spelling,
                     matched: matched.to_owned(),
-                    expected: Some(in_the_case_of(
+                    expected: Some(match_case(
                         matched,
                         &self.expected[found.pattern().as_usize()],
                     )),
@@ -140,8 +139,8 @@ impl DialectRule {
 
 /// Whether the match runs to both ends of the word it sits in.
 ///
-/// A word list carries no stems, so `colorant` is not `color` with letters
-/// after it and reports nothing.
+/// The word list holds no stems, so a match inside a longer word is not a
+/// finding: `colorant` reports nothing.
 fn is_whole_word(text: &str, start: usize, end: usize) -> bool {
     let before = text[..start].chars().next_back();
     let after = text[end..].chars().next();
@@ -150,11 +149,9 @@ fn is_whole_word(text: &str, start: usize, end: usize) -> bool {
 }
 
 /// Writes `expected` in the case `matched` was written in, so the suggestion
-/// can be pasted over the word it replaces.
-///
-/// The word list is lowercase, and a sentence opens with a capital as often
-/// as not.
-fn in_the_case_of(matched: &str, expected: &str) -> String {
+/// can be pasted over the word it replaces. Every entry in the word list is
+/// lowercase.
+fn match_case(matched: &str, expected: &str) -> String {
     if matched.chars().any(char::is_uppercase) && !matched.chars().any(char::is_lowercase) {
         return expected.to_uppercase();
     }
