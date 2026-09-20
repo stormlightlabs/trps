@@ -140,8 +140,9 @@ fn run(args: Args) -> Result<bool, String> {
         .iter()
         .map(|(source, _)| source.text.as_str())
         .collect();
-    let shared = scan_cross_file(&texts, rules.cross_file);
+    let shared = scan_cross_file(&texts, rules.detector.thresholds().cross_file_duplication);
 
+    warn_unknown_thresholds(&rules);
     warn_unknown_rules(&scanned, &rules.detector);
 
     match args.json {
@@ -272,6 +273,26 @@ fn print_json<'a>(
     println!("{json}");
 
     Ok(())
+}
+
+/// Warns about a `[thresholds]` key naming a rule nothing reports. The entry
+/// tunes nothing, and nothing else in a run says so.
+///
+/// Only a dictionary carries the table, so the warning names that file rather
+/// than a place in the prose. It goes to stderr beside the marker warnings
+/// and leaves the exit code alone.
+fn warn_unknown_thresholds(rules: &Rules) {
+    let Some(dictionary) = &rules.dictionary else {
+        return;
+    };
+
+    for rule in rules.detector.thresholds().unknown_rules() {
+        eprintln!(
+            "{} {} [thresholds] no rule is named `{rule}`",
+            "warning:".if_supports_color(Stream::Stderr, |text| text.yellow()),
+            dictionary.display(),
+        );
+    }
 }
 
 /// Warns about a marker naming a rule nothing reports. The marker suppresses

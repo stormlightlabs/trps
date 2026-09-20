@@ -463,7 +463,11 @@ fn a_dictionary_raises_the_cross_file_thresholds() {
         "second.md",
         "A default is written down, rather than left to be discovered.\n",
     );
-    write(&directory, "trps.toml", "[cross_file]\nmin_words = 20\n");
+    write(
+        &directory,
+        "trps.toml",
+        "[thresholds.\"composition.cross_file_duplication\"]\nmin_words = 20\n",
+    );
 
     let output = run(
         Some(&directory),
@@ -721,6 +725,30 @@ fn a_warning_names_its_file_and_leaves_the_json_alone() {
         serde_json::from_str(&stdout(&output)).expect("the report is JSON");
 
     assert_eq!(report["findings"][0]["rule_id"], "word_choice.delve");
+}
+
+#[test]
+fn a_threshold_key_naming_no_rule_warns_without_failing_the_run() {
+    let directory = case_dir("unknown-threshold-warning");
+    write(&directory, "input.md", "The parser reads a file once.\n");
+    write(
+        &directory,
+        "trps.toml",
+        "[thresholds.\"composition.cross_file_duplicaton\"]\nmin_words = 20\n",
+    );
+
+    let output = run(
+        Some(&directory),
+        &["--quiet", "--dictionary", "trps.toml", "input.md"],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        stderr(&output),
+        "warning: trps.toml [thresholds] no rule is named `composition.cross_file_duplicaton`\n"
+    );
 }
 
 #[test]
