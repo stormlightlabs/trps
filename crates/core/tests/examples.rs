@@ -44,11 +44,11 @@ const SLOP_RULES: &[(&str, &[&str])] = &[
         ],
     ),
     ("decoration.md", &["formatting.unicode_decoration"]),
+    ("em-dashes.txt", &["formatting.em_dash_addiction"]),
     (
         "formatting.md",
         &[
             "formatting.bold_first_leads",
-            "formatting.em_dash_addiction",
             "formatting.signposted_conclusion",
         ],
     ),

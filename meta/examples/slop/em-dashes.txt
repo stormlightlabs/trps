@@ -1,0 +1,4 @@
+The migration landed on Tuesday — three weeks late, which nobody wanted — and
+the on-call rota absorbed it. Reviews sat in the queue -- two of them for a
+full day -- while the schema lock held. What broke in the end was the backfill
+— the part we had tested least.

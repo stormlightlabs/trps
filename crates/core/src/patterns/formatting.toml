@@ -1,13 +1,4 @@
 [[patterns]]
-id = "formatting.em_dash_addiction"
-name = "Em-Dash Addiction"
-severity = "medium"
-sources = ["tropes.fyi"]
-phrases = [
-  " -- ",
-]
-
-[[patterns]]
 id = "formatting.signposted_conclusion"
 name = "The Signposted Conclusion"
 severity = "low"
