@@ -4,8 +4,7 @@
 //! `meta/sources.md` carries the catalog and its license.
 
 /// Bullets and paragraphs opening with a bolded span.
-pub const BOLD_FIRST_BULLETS: (&str, &str) =
-    ("formatting.bold_first_bullets", "Bold-First Bullets");
+pub const BOLD_FIRST_LEADS: (&str, &str) = ("formatting.bold_first_leads", "Bold-First Leads");
 
 /// Bolded leads in a row before the run is reported.
 ///
@@ -46,7 +45,7 @@ fn report_run(text: &str, run: &[Span]) -> Option<Finding> {
 
     (run.len() >= BOLD_LEAD_THRESHOLD).then(|| {
         Finding::markdown(
-            BOLD_FIRST_BULLETS,
+            BOLD_FIRST_LEADS,
             Severity::Medium,
             text,
             Span(first.start(), last.end()),
@@ -304,17 +303,17 @@ mod tests {
     }
 
     #[test]
-    fn detects_unordered_bold_first_bullets() {
+    fn detects_unordered_bold_first_leads() {
         let findings = scan_markdown(
             "- **Security**: keys read at startup\n- **Latency**: down by a third\n- **Cost**: flat",
         );
 
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].rule_id, "formatting.bold_first_bullets");
+        assert_eq!(findings[0].rule_id, "formatting.bold_first_leads");
     }
 
     #[test]
-    fn detects_numbered_bold_first_bullets() {
+    fn detects_numbered_bold_first_leads() {
         let findings = scan_markdown(
             "1. __Performance__: lazy loading\n2. __Security__: keys\n3. __Cost__: flat\n",
         );
@@ -333,7 +332,7 @@ mod tests {
         );
 
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].rule_id, "formatting.bold_first_bullets");
+        assert_eq!(findings[0].rule_id, "formatting.bold_first_leads");
     }
 
     #[test]
