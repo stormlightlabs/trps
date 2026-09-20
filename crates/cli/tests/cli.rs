@@ -396,6 +396,88 @@ fn crlf_text_reports_the_same_place_as_lf_text() {
     assert_eq!(stdout(&crlf), stdout(&lf));
 }
 
+#[test]
+fn an_excluded_path_is_left_out_of_the_scan() {
+    let directory = case_dir("excluded-path");
+    write(&directory, "guide.md", DOMAIN_PROSE);
+    write(&directory, "notebook/captured.md", DOMAIN_PROSE);
+    write(&directory, "trps.toml", "exclude = [\"notebook/\"]\n");
+
+    let output = run(
+        Some(&directory),
+        &["--json", "guide.md", "notebook/captured.md"],
+        "",
+        &[],
+    );
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stdout(&output).contains("guide.md"));
+    assert!(
+        !stdout(&output).contains("captured.md"),
+        "{}",
+        stdout(&output)
+    );
+}
+
+#[test]
+fn a_run_over_only_excluded_paths_finds_nothing() {
+    let directory = case_dir("wholly-excluded");
+    write(&directory, "notebook/captured.md", DOMAIN_PROSE);
+    write(&directory, "trps.toml", "exclude = [\"notebook/**\"]\n");
+
+    let output = run(Some(&directory), &["notebook/captured.md"], "", &[]);
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stdout(&output), "");
+}
+
+#[test]
+fn an_exclude_pattern_that_is_not_a_glob_exits_two() {
+    let directory = case_dir("bad-exclude");
+    write(&directory, "input.md", DOMAIN_PROSE);
+    write(&directory, "trps.toml", "exclude = [\"notebook/[\"]\n");
+
+    let output = run(Some(&directory), &["input.md"], "", &[]);
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("notebook/["));
+}
+
+#[test]
+fn a_marked_line_is_kept_out_of_the_report() {
+    let output = scan(
+        None,
+        "<!-- trps-ignore-next-line -->\nLet us delve into this.\nThe parser reads a file once.\n",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stdout(&output), "");
+}
+
+#[test]
+fn a_marked_region_is_kept_out_of_the_report() {
+    let output = scan(
+        None,
+        concat!(
+            "Quoting the thing it criticizes:\n",
+            "<!-- trps-ignore-start -->\n",
+            "Let us delve into this robust ecosystem.\n",
+            "<!-- trps-ignore-end -->\n",
+            "Which is why we delve into nothing.\n",
+        ),
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        stdout(&output).contains("  ├─ phrase 5:17-26\n"),
+        "{}",
+        stdout(&output)
+    );
+    assert_eq!(stdout(&output).matches("word_choice.delve").count(), 1);
+}
+
 fn example(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../meta/examples")
@@ -470,6 +552,13 @@ fn case_dir(name: &str) -> PathBuf {
     directory
 }
 
+/// Writes a case file, creating the directories `name` reaches through.
 fn write(directory: &Path, name: &str, contents: &str) {
-    fs::write(directory.join(name), contents).expect("failed to write a case file");
+    let path = directory.join(name);
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).expect("failed to create a case directory");
+    }
+
+    fs::write(path, contents).expect("failed to write a case file");
 }

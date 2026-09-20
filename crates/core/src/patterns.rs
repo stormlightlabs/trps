@@ -54,7 +54,7 @@ impl Severity {
 ///
 /// The bundled dictionaries and a project dictionary share this shape. Bundled
 /// files declare patterns only; a project dictionary can also list phrases to
-/// remove from them.
+/// remove from them and paths to keep out of a scan.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PatternFile {
@@ -62,6 +62,10 @@ pub struct PatternFile {
     /// case-insensitively.
     #[serde(default)]
     pub allow: Vec<String>,
+    /// Globs naming paths no scan reads, relative to the directory holding
+    /// this file. See [`crate::excludes::Excludes`].
+    #[serde(default)]
+    pub exclude: Vec<String>,
     /// Pattern entries declared by the file.
     #[serde(default)]
     pub patterns: Vec<Pattern>,

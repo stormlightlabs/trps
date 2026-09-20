@@ -12,6 +12,7 @@ use aho_corasick::{AhoCorasick, MatchKind};
 use crate::errors::DetectorBuildError;
 use crate::patterns::{Pattern, Severity};
 use crate::patterns::{bundled_patterns, validate_patterns};
+use crate::suppression::Suppressions;
 
 /// Finds trope signals in prose.
 #[derive(Debug)]
@@ -54,12 +55,18 @@ impl Detector {
     }
 
     /// Scans text with all enabled detectors.
+    ///
+    /// Findings the text suppressed in place are dropped here rather than by
+    /// the caller, so every reader of a scan sees the same document.
     pub fn scan(&self, text: &str) -> Vec<Finding> {
+        let suppressions = Suppressions::new(text);
         let mut findings = self.scan_phrases(text);
+
         findings.extend(char_class::scan_unicode_decoration(text));
         findings.extend(markdown::scan_markdown(text));
         findings.extend(structural::scan_structural(text));
         findings.extend(repetition::scan_repetition(text));
+        findings.retain(|finding| !suppressions.covers(finding.span.start()));
         findings.sort_by_key(|finding| finding.span.start());
         findings
     }
@@ -391,6 +398,24 @@ mod tests {
         assert_eq!(
             index.locate(delve.span.start()),
             Location { line: 2, column: 8 }
+        );
+    }
+
+    #[test]
+    fn a_scan_drops_the_findings_the_text_suppressed() {
+        let detector = Detector::bundled().unwrap();
+        let text = "trps-ignore-next-line\nLet us delve into this.\nLet us delve into that.\n";
+        let findings = detector.scan(text);
+        let delve: Vec<_> = findings
+            .iter()
+            .filter(|finding| finding.rule_id == "word_choice.delve")
+            .collect();
+
+        assert_eq!(delve.len(), 1);
+        assert_eq!(
+            LineIndex::new(text).locate(delve[0].span.start()).line,
+            3,
+            "only the marked line is suppressed"
         );
     }
 

@@ -16,6 +16,14 @@ pub enum DetectorBuildError {
     AhoCorasick(#[from] aho_corasick::BuildError),
 }
 
+/// Errors that can happen while compiling a dictionary's path excludes.
+#[derive(Debug, Error)]
+pub enum ExcludeError {
+    /// An exclude pattern is not a valid glob.
+    #[error(transparent)]
+    Glob(#[from] globset::Error),
+}
+
 /// Errors that can happen while loading bundled pattern dictionaries.
 #[derive(Debug, Error)]
 pub enum PatternLoadError {

@@ -147,6 +147,53 @@ Declared patterns are matched before the bundled ones, so a project phrase wins
 where the two overlap: a rule for `landscape architecture` reports that span
 rather than losing it to the bundled `landscape`.
 
+### Excluding paths
+
+Some prose is never worth grading: research captured from elsewhere, imported
+reference pages, anything written to a house format the bundled patterns read
+as slop. `exclude` names those paths in the same file.
+
+```toml
+exclude = ["docs/notebook/", "meta/examples/**"]
+```
+
+Patterns are globs matched against the path relative to the directory holding
+the dictionary. `*` stops at a `/` and `**` crosses one, so `docs/*.md` takes
+the Markdown directly under `docs` and `docs/**/*.md` takes it at any depth. A
+pattern ending in `/` is the directory and everything under it.
+
+An excluded path is skipped before it is read, so naming one on the command
+line reports nothing and is not an error. A path outside the dictionary's
+directory is never excluded: the list belongs to one repository and says
+nothing about a file kept somewhere else.
+
+## Suppressing a finding in place
+
+Mark a span you have decided to keep in the prose rather than in the
+dictionary, so the reason sits next to the text. Quoted slop is the case that
+needs it. A document quoting a trope to criticize it is graded for the trope it
+quotes, and no dictionary entry tells that apart from the real thing.
+
+`trps-ignore-next-line` drops the findings on the line after it:
+
+```markdown
+<!-- trps-ignore-next-line -->
+The ecosystem is robust, they wrote, and we left it standing.
+```
+
+`trps-ignore-start` and `trps-ignore-end` drop everything between them,
+including the two marker lines:
+
+```markdown
+<!-- trps-ignore-start -->
+> Let us delve into this robust ecosystem.
+<!-- trps-ignore-end -->
+```
+
+A marker counts anywhere on a line, so every comment syntax carries one and a
+plain text file can write the bare word. A region left open runs to the end of
+the file.
+
 ## Coverage
 
 - an implementation path for every source section in
