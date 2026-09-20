@@ -3,6 +3,8 @@
 //! Every rule here comes from the Tropes.fyi list in `meta/tropes.md`.
 //! `meta/sources.md` carries the catalog and its license.
 
+use serde::Deserialize;
+
 use crate::patterns::Severity;
 
 use super::{Finding, FindingKind, Span, paragraph_spans, word_spans};
@@ -26,31 +28,70 @@ pub const EM_DASH_ADDICTION: (&str, &str) = ("formatting.em_dash_addiction", "Em
 /// them across the whole document rather than inside a section.
 const DECORATION_CLASSES: &[&[char]] = &[&['“', '”'], &['→', '←', '↔', '⇒']];
 
-/// Occurrences of one class inside one section before it is reported.
-const DECORATION_THRESHOLD: usize = 3;
+/// What counts as decoration repeated often enough to report, under
+/// `formatting.unicode_decoration`.
+///
+/// The default was calibrated against `meta/examples`, which holds short
+/// prose. A project writing quoted terms or arrow diagrams raises it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DecorationLimits {
+    /// Occurrences of one class inside one section before it is reported.
+    /// Below two the rule would report a single curly quote, so two is the
+    /// floor.
+    pub min_occurrences: usize,
+}
+
+impl Default for DecorationLimits {
+    fn default() -> Self {
+        Self { min_occurrences: 3 }
+    }
+}
 
 /// The Unicode dashes the em-dash rule counts. The ASCII `--` proxy needs the
 /// characters around it, so [`ascii_dash_spans`] finds that form.
 const DASHES: &[char] = &['—', '–'];
 
-/// Dashes below which neither em-dash threshold reports. One aside is written
-/// with a dash on each side of it, so density starts above a pair.
-const DASH_FLOOR: usize = 3;
+/// What counts as dash use dense enough to read as a habit, under
+/// `formatting.em_dash_addiction`.
+///
+/// The defaults were calibrated against `meta/examples`, which holds short
+/// prose. How many dashes read as a habit is a house-style call, so a project
+/// writing more of them raises these rather than silencing the rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DashLimits {
+    /// Dashes below which neither threshold reports. One aside is written
+    /// with a dash on each side of it, so density starts above a pair. Below
+    /// two the rule would report a lone dash, so two is the floor.
+    pub floor: usize,
+    /// Dashes that report whatever the document's length. `meta/tropes.md`
+    /// puts a human writer at two or three in a piece. Two is the floor here
+    /// as well.
+    pub count: usize,
+    /// Dashes per hundred words that report a document too short to reach
+    /// [`DashLimits::count`]. At zero every document is dense, which leaves
+    /// no rate at all, so one is the floor.
+    pub rate_per_hundred_words: usize,
+}
 
-/// Dashes that report whatever the document's length. `meta/tropes.md` puts a
-/// human writer at two or three in a piece.
-const DASH_COUNT: usize = 6;
-
-/// Dashes per hundred words that report a document too short to reach
-/// [`DASH_COUNT`].
-const DASH_RATE_PER_HUNDRED_WORDS: usize = 2;
+impl Default for DashLimits {
+    fn default() -> Self {
+        Self {
+            floor: 3,
+            count: 6,
+            rate_per_hundred_words: 2,
+        }
+    }
+}
 
 /// Finds Unicode punctuation and decorative symbols repeated inside a section.
 ///
 /// One finding covers one class in one section. It spans the first occurrence
 /// to the last and matches the characters themselves, so it reports how many
 /// there were and where.
-pub fn scan_unicode_decoration(text: &str) -> Vec<Finding> {
+pub fn scan_unicode_decoration(text: &str, limits: DecorationLimits) -> Vec<Finding> {
+    let min_occurrences = limits.min_occurrences.max(2);
     let mut findings = Vec::new();
 
     for section in paragraph_spans(text) {
@@ -65,7 +106,7 @@ pub fn scan_unicode_decoration(text: &str) -> Vec<Finding> {
                 .map(|(offset, character)| (section.start() + offset, character))
                 .collect();
 
-            if hits.len() < DECORATION_THRESHOLD {
+            if hits.len() < min_occurrences {
                 continue;
             }
 
@@ -100,8 +141,11 @@ pub fn scan_unicode_decoration(text: &str) -> Vec<Finding> {
 ///
 /// A long piece reports on the count alone. A short one reports on the rate,
 /// because six dashes in a paragraph and six in a chapter are not the same
-/// habit. Either way two dashes are left alone, which is one aside.
-pub fn scan_em_dash_addiction(text: &str) -> Vec<Finding> {
+/// habit. Either way the default leaves two dashes alone, which is one aside.
+pub fn scan_em_dash_addiction(text: &str, limits: DashLimits) -> Vec<Finding> {
+    let floor = limits.floor.max(2);
+    let count = limits.count.max(2);
+    let rate = limits.rate_per_hundred_words.max(1);
     let mut spans: Vec<Span> = text
         .char_indices()
         .filter(|(offset, character)| {
@@ -114,10 +158,9 @@ pub fn scan_em_dash_addiction(text: &str) -> Vec<Finding> {
     spans.sort_by_key(Span::start);
 
     let words = word_spans(text).len();
-    let dense =
-        spans.len() >= DASH_COUNT || spans.len() * 100 >= DASH_RATE_PER_HUNDRED_WORDS * words;
+    let dense = spans.len() >= count || spans.len() * 100 >= rate * words;
 
-    if spans.len() < DASH_FLOOR || !dense {
+    if spans.len() < floor || !dense {
         return Vec::new();
     }
 
@@ -174,9 +217,19 @@ fn is_numeric_range(value: &str, offset: usize, character: char) -> bool {
 mod tests {
     use super::*;
 
+    /// Scans for decoration at the counts the tool ships with.
+    fn scan_decoration(text: &str) -> Vec<Finding> {
+        scan_unicode_decoration(text, DecorationLimits::default())
+    }
+
+    /// Scans for dashes at the counts the tool ships with.
+    fn scan_dashes(text: &str) -> Vec<Finding> {
+        scan_em_dash_addiction(text, DashLimits::default())
+    }
+
     #[test]
     fn finds_a_repeated_decoration_class() {
-        let findings = scan_unicode_decoration("A → b → c → d");
+        let findings = scan_decoration("A → b → c → d");
 
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].matched, "→ → →");
@@ -186,19 +239,19 @@ mod tests {
 
     #[test]
     fn ignores_a_lone_decoration() {
-        assert!(scan_unicode_decoration("Input → Processing").is_empty());
+        assert!(scan_decoration("Input → Processing").is_empty());
     }
 
     #[test]
     fn counts_each_class_on_its_own() {
-        let findings = scan_unicode_decoration("A “b” c → d");
+        let findings = scan_decoration("A “b” c → d");
 
         assert!(findings.is_empty());
     }
 
     #[test]
     fn reports_each_class_that_repeats() {
-        let findings = scan_unicode_decoration("A → b → c → d, “e”, “f”, and “g”");
+        let findings = scan_decoration("A → b → c → d, “e”, “f”, and “g”");
 
         let matched: Vec<_> = findings
             .iter()
@@ -210,27 +263,27 @@ mod tests {
 
     #[test]
     fn does_not_count_across_sections() {
-        assert!(scan_unicode_decoration("One →\n\nTwo →\n\nThree →").is_empty());
+        assert!(scan_decoration("One →\n\nTwo →\n\nThree →").is_empty());
     }
 
     #[test]
     fn ignores_curly_apostrophes() {
-        assert!(scan_unicode_decoration("It’s the writer’s reader’s call").is_empty());
+        assert!(scan_decoration("It’s the writer’s reader’s call").is_empty());
     }
 
     #[test]
     fn ignores_ascii_arrows() {
-        assert!(scan_unicode_decoration("Input -> output -> result -> done").is_empty());
+        assert!(scan_decoration("Input -> output -> result -> done").is_empty());
     }
 
     #[test]
     fn leaves_dashes_to_the_em_dash_rule() {
-        assert!(scan_unicode_decoration("A — b — c — d").is_empty());
+        assert!(scan_decoration("A — b — c — d").is_empty());
     }
 
     #[test]
     fn counts_the_ascii_proxy_with_the_unicode_forms() {
-        let findings = scan_em_dash_addiction("A — b -- c – d");
+        let findings = scan_dashes("A — b -- c – d");
 
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].matched, "— -- –");
@@ -242,53 +295,144 @@ mod tests {
     fn ignores_one_aside() {
         let aside = "The change — long overdue — shipped on Friday.";
 
-        assert!(scan_em_dash_addiction(aside).is_empty());
+        assert!(scan_dashes(aside).is_empty());
     }
 
     #[test]
     fn ignores_a_single_dash_in_a_page() {
         let page = format!("{}— and it shipped.", "word ".repeat(400));
 
-        assert!(scan_em_dash_addiction(&page).is_empty());
+        assert!(scan_dashes(&page).is_empty());
     }
 
     #[test]
     fn counts_across_sections() {
-        assert_eq!(scan_em_dash_addiction("One —\n\nTwo —\n\nThree —").len(), 1);
+        assert_eq!(scan_dashes("One —\n\nTwo —\n\nThree —").len(), 1);
     }
 
     #[test]
     fn reports_a_long_document_on_the_count_alone() {
         let document = format!("{}— ", "word ".repeat(60)).repeat(6);
 
-        assert_eq!(scan_em_dash_addiction(&document).len(), 1);
+        assert_eq!(scan_dashes(&document).len(), 1);
     }
 
     #[test]
     fn leaves_the_same_document_alone_one_dash_short() {
         let document = format!("{}— ", "word ".repeat(60)).repeat(5);
 
-        assert!(scan_em_dash_addiction(&document).is_empty());
+        assert!(scan_dashes(&document).is_empty());
     }
 
     #[test]
     fn ignores_en_dashes_between_digits() {
         let ranges = "The window ran 2019–2021, the audit 2022–2023, and the review 2024–2025.";
 
-        assert!(scan_em_dash_addiction(ranges).is_empty());
+        assert!(scan_dashes(ranges).is_empty());
     }
 
     #[test]
     fn ignores_thematic_breaks() {
         let breaks = "One\n\n---\n\nTwo\n\n---\n\nThree\n\n---\n\nFour";
 
-        assert!(scan_em_dash_addiction(breaks).is_empty());
+        assert!(scan_dashes(breaks).is_empty());
     }
 
     #[test]
     fn ignores_command_flags() {
         let command = "Run cargo test --workspace --all-features --locked";
 
-        assert!(scan_em_dash_addiction(command).is_empty());
+        assert!(scan_dashes(command).is_empty());
+    }
+
+    #[test]
+    fn a_tuned_dash_count_moves_where_a_long_document_reports() {
+        let six = format!("{}— ", "word ".repeat(60)).repeat(6);
+        let five = format!("{}— ", "word ".repeat(60)).repeat(5);
+        let raised = DashLimits {
+            count: 8,
+            ..DashLimits::default()
+        };
+        let lowered = DashLimits {
+            count: 5,
+            ..DashLimits::default()
+        };
+
+        assert!(scan_em_dash_addiction(&six, raised).is_empty());
+        assert_eq!(scan_em_dash_addiction(&five, lowered).len(), 1);
+    }
+
+    #[test]
+    fn a_tuned_dash_floor_moves_the_dashes_a_document_is_left_alone_at() {
+        let aside = "The change — long overdue — shipped on Friday.";
+        let three = "A — b — c — d";
+        let raised = DashLimits {
+            floor: 4,
+            ..DashLimits::default()
+        };
+        let lowered = DashLimits {
+            floor: 2,
+            ..DashLimits::default()
+        };
+
+        assert!(scan_em_dash_addiction(three, raised).is_empty());
+        assert_eq!(scan_em_dash_addiction(aside, lowered).len(), 1);
+    }
+
+    #[test]
+    fn a_tuned_dash_rate_moves_where_a_short_document_reports() {
+        let dense = format!("{}— ", "word ".repeat(40)).repeat(5);
+        let sparse = format!("{}— ", "word ".repeat(60)).repeat(5);
+        let raised = DashLimits {
+            rate_per_hundred_words: 4,
+            ..DashLimits::default()
+        };
+        let lowered = DashLimits {
+            rate_per_hundred_words: 1,
+            ..DashLimits::default()
+        };
+
+        assert_eq!(scan_dashes(&dense).len(), 1);
+        assert!(scan_em_dash_addiction(&dense, raised).is_empty());
+        assert!(scan_dashes(&sparse).is_empty());
+        assert_eq!(scan_em_dash_addiction(&sparse, lowered).len(), 1);
+    }
+
+    #[test]
+    fn dash_counts_set_below_two_report_one_aside_rather_than_a_lone_dash() {
+        let lone = "The change shipped — late.";
+        let aside = "The change — long overdue — shipped.";
+        let below = DashLimits {
+            floor: 0,
+            count: 0,
+            rate_per_hundred_words: 0,
+        };
+
+        assert!(scan_em_dash_addiction(lone, below).is_empty());
+        assert_eq!(scan_em_dash_addiction(aside, below).len(), 1);
+    }
+
+    #[test]
+    fn a_tuned_decoration_count_moves_where_a_class_reports() {
+        let two = "A → b → c";
+        let three = "A → b → c → d";
+
+        assert!(scan_decoration(two).is_empty());
+        assert_eq!(
+            scan_unicode_decoration(two, DecorationLimits { min_occurrences: 2 }).len(),
+            1
+        );
+        assert_eq!(scan_decoration(three).len(), 1);
+        assert!(scan_unicode_decoration(three, DecorationLimits { min_occurrences: 4 }).is_empty());
+    }
+
+    #[test]
+    fn a_decoration_count_set_below_two_reports_no_single_curly_quote() {
+        let single = "He said “hello there.";
+        let quoted = "He said “hello there.”";
+        let below = DecorationLimits { min_occurrences: 1 };
+
+        assert!(scan_unicode_decoration(single, below).is_empty());
+        assert_eq!(scan_unicode_decoration(quoted, below).len(), 1);
     }
 }

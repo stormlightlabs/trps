@@ -6,22 +6,41 @@
 /// Bullets and paragraphs opening with a bolded span.
 pub const BOLD_FIRST_LEADS: (&str, &str) = ("formatting.bold_first_leads", "Bold-First Leads");
 
-/// Bolded leads in a row before the run is reported.
-///
-/// A writer reaches for one bolded lead, and sometimes for two. Three in a
-/// row is an opening filled in from a template, which is the trope.
-const BOLD_LEAD_THRESHOLD: usize = 3;
+use serde::Deserialize;
 
 use crate::patterns::Severity;
 
 use super::{Finding, Span};
+
+/// What counts as a run of bolded leads, under
+/// `formatting.bold_first_leads`.
+///
+/// The default was calibrated against `meta/examples`, which holds short
+/// prose. A project whose house style opens every bullet in bold raises it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct BoldLeadLimits {
+    /// Bolded leads in a row before the run is reported.
+    ///
+    /// A writer reaches for one bolded lead, and sometimes for two. Three in
+    /// a row is an opening filled in from a template, which is the trope.
+    /// Below two a single lead is a run of one, so two is the floor.
+    pub min_leads: usize,
+}
+
+impl Default for BoldLeadLimits {
+    fn default() -> Self {
+        Self { min_leads: 3 }
+    }
+}
 
 /// Finds markdown-specific trope signals.
 ///
 /// A run of bolded leads is the signal, so a list and a sequence of
 /// paragraphs are read the same way. One finding covers one run, from the
 /// first lead to the last.
-pub fn scan_markdown(text: &str) -> Vec<Finding> {
+pub fn scan_markdown(text: &str, limits: BoldLeadLimits) -> Vec<Finding> {
+    let min_leads = limits.min_leads.max(2);
     let mut findings = Vec::new();
     let mut run = Vec::new();
 
@@ -31,19 +50,19 @@ pub fn scan_markdown(text: &str) -> Vec<Finding> {
             continue;
         }
 
-        findings.extend(report_run(text, &run));
+        findings.extend(report_run(text, &run, min_leads));
         run.clear();
     }
 
-    findings.extend(report_run(text, &run));
+    findings.extend(report_run(text, &run, min_leads));
     findings
 }
 
 /// The finding a run of bolded leads reports, where the run is long enough.
-fn report_run(text: &str, run: &[Span]) -> Option<Finding> {
+fn report_run(text: &str, run: &[Span], min_leads: usize) -> Option<Finding> {
     let (first, last) = (run.first()?, run.last()?);
 
-    (run.len() >= BOLD_LEAD_THRESHOLD).then(|| {
+    (run.len() >= min_leads).then(|| {
         Finding::markdown(
             BOLD_FIRST_LEADS,
             Severity::Medium,
@@ -237,6 +256,11 @@ fn front_matter_span(text: &str) -> Option<Span> {
 mod tests {
     use super::*;
 
+    /// Scans for bolded leads at the count the tool ships with.
+    fn scan_leads(text: &str) -> Vec<Finding> {
+        scan_markdown(text, BoldLeadLimits::default())
+    }
+
     #[test]
     fn masking_blanks_a_fenced_block_without_moving_offsets() {
         let text = "Prose above.\n\n```text\nRun the thing.\n```\n\nProse below.\n";
@@ -304,7 +328,7 @@ mod tests {
 
     #[test]
     fn detects_unordered_bold_first_leads() {
-        let findings = scan_markdown(
+        let findings = scan_leads(
             "- **Security**: keys read at startup\n- **Latency**: down by a third\n- **Cost**: flat",
         );
 
@@ -314,7 +338,7 @@ mod tests {
 
     #[test]
     fn detects_numbered_bold_first_leads() {
-        let findings = scan_markdown(
+        let findings = scan_leads(
             "1. __Performance__: lazy loading\n2. __Security__: keys\n3. __Cost__: flat\n",
         );
 
@@ -327,7 +351,7 @@ mod tests {
 
     #[test]
     fn detects_bold_first_paragraphs() {
-        let findings = scan_markdown(
+        let findings = scan_leads(
             "**Starting from nothing.** Run the thing.\n\n**Starting from an issue.** Run the other thing.\n\n**Not sure what to do.** Run triage.\n",
         );
 
@@ -337,15 +361,13 @@ mod tests {
 
     #[test]
     fn one_bolded_lead_is_emphasis_rather_than_a_template() {
-        assert!(scan_markdown("- **Security**: keys read at startup\n- Latency held.").is_empty());
-        assert!(
-            scan_markdown("**Security.** Keys are read at startup.\n\nLatency held.").is_empty()
-        );
+        assert!(scan_leads("- **Security**: keys read at startup\n- Latency held.").is_empty());
+        assert!(scan_leads("**Security.** Keys are read at startup.\n\nLatency held.").is_empty());
     }
 
     #[test]
     fn a_wrapped_bullet_does_not_end_a_run() {
-        let findings = scan_markdown(
+        let findings = scan_leads(
             "- **Security**: keys read at startup, which is\n  where the operator sets them\n- **Latency**: down\n- **Cost**: flat\n",
         );
 
@@ -354,7 +376,7 @@ mod tests {
 
     #[test]
     fn a_block_without_a_bolded_lead_ends_the_run() {
-        let findings = scan_markdown(
+        let findings = scan_leads(
             "**Security.** Keys are read at startup.\n\nThe rest of the config is read with it.\n\n**Latency.** It fell by a third.\n\n**Cost.** It held flat.\n",
         );
 
@@ -363,7 +385,7 @@ mod tests {
 
     #[test]
     fn a_heading_ends_the_run_it_interrupts() {
-        let findings = scan_markdown(
+        let findings = scan_leads(
             "**Security.** Keys are read at startup.\n\n**Latency.** It fell by a third.\n\n## Next quarter\n\n**Cost.** It holds flat.\n",
         );
 
@@ -372,7 +394,7 @@ mod tests {
 
     #[test]
     fn ignores_bold_later_in_bullets() {
-        let findings = scan_markdown(
+        let findings = scan_leads(
             "- The **security** setting\n- The **latency** budget\n- The **cost** ceiling",
         );
 
@@ -380,8 +402,27 @@ mod tests {
     }
 
     #[test]
+    fn a_tuned_bold_lead_count_moves_where_a_run_reports() {
+        let two = "- **Security**: keys read at startup\n- **Latency**: down by a third";
+        let three = "- **Security**: keys\n- **Latency**: down\n- **Cost**: flat";
+
+        assert!(scan_leads(two).is_empty());
+        assert_eq!(scan_markdown(two, BoldLeadLimits { min_leads: 2 }).len(), 1);
+        assert_eq!(scan_leads(three).len(), 1);
+        assert!(scan_markdown(three, BoldLeadLimits { min_leads: 4 }).is_empty());
+    }
+
+    #[test]
+    fn a_bold_lead_count_set_below_two_reports_no_single_lead() {
+        let one = "- **Security**: keys read at startup\n- Latency held.";
+        let below = BoldLeadLimits { min_leads: 1 };
+
+        assert!(scan_markdown(one, below).is_empty());
+    }
+
+    #[test]
     fn ignores_unclosed_bold() {
-        let findings = scan_markdown("- **Security: keys\n- **Latency: down\n- **Cost: flat");
+        let findings = scan_leads("- **Security: keys\n- **Latency: down\n- **Cost: flat");
 
         assert!(findings.is_empty());
     }

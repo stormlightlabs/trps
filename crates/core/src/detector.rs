@@ -137,9 +137,18 @@ impl Detector {
         let suppressions = Suppressions::new(text);
         let mut findings = self.scan_phrases(text);
 
-        findings.extend(char_class::scan_em_dash_addiction(text));
-        findings.extend(char_class::scan_unicode_decoration(text));
-        findings.extend(markdown::scan_markdown(text));
+        findings.extend(char_class::scan_em_dash_addiction(
+            text,
+            self.thresholds.em_dash_addiction,
+        ));
+        findings.extend(char_class::scan_unicode_decoration(
+            text,
+            self.thresholds.unicode_decoration,
+        ));
+        findings.extend(markdown::scan_markdown(
+            text,
+            self.thresholds.bold_first_leads,
+        ));
         findings.extend(structural::scan_structural(text));
         findings.extend(repetition::scan_repetition(text));
 
@@ -857,6 +866,30 @@ min_words = 20
             Detector::bundled().unwrap().thresholds(),
             &Thresholds::default()
         );
+    }
+
+    #[test]
+    fn a_lowered_count_reaches_the_rule_that_reads_it() {
+        let thresholds = PatternFile::from_toml(
+            r#"
+[thresholds."formatting.unicode_decoration"]
+min_occurrences = 2
+"#,
+        )
+        .unwrap()
+        .thresholds;
+        let text = "Input → output → result";
+        let decoration = |detector: Detector| {
+            detector
+                .scan(text)
+                .iter()
+                .any(|finding| finding.rule_id == char_class::UNICODE_DECORATION_RULE_ID)
+        };
+
+        assert!(!decoration(Detector::bundled().unwrap()));
+        assert!(decoration(
+            Detector::bundled().unwrap().with_thresholds(thresholds)
+        ));
     }
 
     #[test]

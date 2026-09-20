@@ -6,8 +6,12 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Deserializer, de};
 
+use crate::detector::char_class::{
+    DashLimits, DecorationLimits, EM_DASH_ADDICTION, UNICODE_DECORATION_RULE_ID,
+};
 use crate::detector::cross_file::{CROSS_FILE_DUPLICATION, CrossFileLimits};
 use crate::detector::dialect::Dialect;
+use crate::detector::markdown::{BOLD_FIRST_LEADS, BoldLeadLimits};
 use crate::errors::{PatternLoadError, PatternValidationError};
 
 /// File names a project dictionary is discovered under, in search order.
@@ -180,6 +184,15 @@ pub struct Thresholds {
     /// What counts as a repetition several files share, under
     /// `composition.cross_file_duplication`. See [`CrossFileLimits`].
     pub cross_file_duplication: CrossFileLimits,
+    /// What counts as a run of bolded leads, under
+    /// `formatting.bold_first_leads`. See [`BoldLeadLimits`].
+    pub bold_first_leads: BoldLeadLimits,
+    /// What counts as dash use dense enough to read as a habit, under
+    /// `formatting.em_dash_addiction`. See [`DashLimits`].
+    pub em_dash_addiction: DashLimits,
+    /// What counts as decoration repeated often enough to report, under
+    /// `formatting.unicode_decoration`. See [`DecorationLimits`].
+    pub unicode_decoration: DecorationLimits,
     unknown: Vec<String>,
 }
 
@@ -203,19 +216,27 @@ impl Thresholds {
                 false => format!("{prefix}.{key}"),
             };
 
-            if rule == CROSS_FILE_DUPLICATION.0 {
-                self.cross_file_duplication = value.try_into().map_err(de::Error::custom)?;
-                continue;
-            }
-
-            match value {
-                toml::Value::Table(nested) if groups_rules(&nested) => self.read(&rule, nested)?,
-                _ => self.unknown.push(rule),
+            match rule.as_str() {
+                id if id == CROSS_FILE_DUPLICATION.0 => self.cross_file_duplication = entry(value)?,
+                id if id == BOLD_FIRST_LEADS.0 => self.bold_first_leads = entry(value)?,
+                id if id == EM_DASH_ADDICTION.0 => self.em_dash_addiction = entry(value)?,
+                id if id == UNICODE_DECORATION_RULE_ID => self.unicode_decoration = entry(value)?,
+                _ => match value {
+                    toml::Value::Table(nested) if groups_rules(&nested) => {
+                        self.read(&rule, nested)?
+                    }
+                    _ => self.unknown.push(rule),
+                },
             }
         }
 
         Ok(())
     }
+}
+
+/// Reads one rule's entry from the value written under its id.
+fn entry<T: de::DeserializeOwned, E: de::Error>(value: toml::Value) -> Result<T, E> {
+    value.try_into().map_err(de::Error::custom)
 }
 
 /// Whether a table under a key naming no rule holds the rest of longer ids.
@@ -860,6 +881,65 @@ min_words = 20
                 min_files: 2,
             }
         );
+        assert_eq!(file.thresholds.unknown_rules().count(), 0);
+    }
+
+    #[test]
+    fn a_dictionary_tunes_the_character_and_markdown_counts() {
+        let file = PatternFile::from_toml(
+            r#"
+[thresholds."formatting.em_dash_addiction"]
+floor = 4
+count = 10
+rate_per_hundred_words = 3
+
+[thresholds."formatting.unicode_decoration"]
+min_occurrences = 5
+
+[thresholds."formatting.bold_first_leads"]
+min_leads = 2
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            file.thresholds.em_dash_addiction,
+            DashLimits {
+                floor: 4,
+                count: 10,
+                rate_per_hundred_words: 3,
+            }
+        );
+        assert_eq!(
+            file.thresholds.unicode_decoration,
+            DecorationLimits { min_occurrences: 5 }
+        );
+        assert_eq!(
+            file.thresholds.bold_first_leads,
+            BoldLeadLimits { min_leads: 2 }
+        );
+        assert_eq!(file.thresholds.unknown_rules().count(), 0);
+    }
+
+    #[test]
+    fn the_character_and_markdown_rules_read_an_unquoted_id_too() {
+        let file = PatternFile::from_toml(
+            r#"
+[thresholds.formatting.em_dash_addiction]
+count = 10
+
+[thresholds.formatting.unicode_decoration]
+min_occurrences = 5
+
+[thresholds.formatting.bold_first_leads]
+min_leads = 2
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(file.thresholds.em_dash_addiction.count, 10);
+        assert_eq!(file.thresholds.unicode_decoration.min_occurrences, 5);
+        assert_eq!(file.thresholds.bold_first_leads.min_leads, 2);
         assert_eq!(file.thresholds.unknown_rules().count(), 0);
     }
 
