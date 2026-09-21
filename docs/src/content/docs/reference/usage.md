@@ -58,16 +58,12 @@ lectito 'https://www.solo.io/blog/what-is-agent-identity-human-workload-a-new-la
 
 A scan grades the prose of a file and skips the parts nobody wrote as prose:
 
-- Fenced code blocks, and everything between the fences. A block holds sample
-  output, a command, or a quoted defect, so grading it reports the quoted text
-  rather than the writing around it.
+- Fenced code blocks, and everything between the fences.
 - YAML front matter, delimiters included.
 
 The rules that count sentences next to each other read one paragraph at a
 time, and a heading, a table row, a block quote, and a list item are not part
-of one. Three bullets opening with the same two words are a list rather than
-anaphora, and a lead-in line above a list is not a run of fragments with the
-list under it.
+of one.
 
 A sentence ends at a `.`, `!`, or `?` with whitespace or the end of the file
 after it. A terminator inside a token does not end one, so `src/lib.rs` and
@@ -103,9 +99,8 @@ A run that matches nothing says so on stderr:
 clean: nothing in the catalogue matched. Hedges, filler adverbs, and editorial asides are not in it.
 ```
 
-The catalogue is partial, so a clean run is not a verdict on the prose. The
-line goes to stderr, where a `--json` pipeline reading stdout never sees it,
-and `-q` or `--quiet` drops it.
+The catalogue is partial, so a clean run is not a verdict on the prose. `-q`
+or `--quiet` drops the line.
 
 ## Exit codes
 

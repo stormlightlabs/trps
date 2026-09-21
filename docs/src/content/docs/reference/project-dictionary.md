@@ -128,12 +128,12 @@ uses and `door` at eight. Raise a count to the lowest number that quiets what
 you meant to quiet.
 
 A rule id holds a dot, so `[thresholds."composition.dead_metaphor"]` and
-`[thresholds.composition.dead_metaphor]` are different TOML and the same entry.
+`[thresholds.composition.dead_metaphor]` reach the same entry.
 
-A key naming no rule is kept rather than failing the load: the CLI warns on
-stderr, names the dictionary it read, and leaves the exit code alone. The
-fields inside a rule's entry are fixed, so `min_repeat` under
-`[thresholds."composition.dead_metaphor"]` fails the load rather than warning.
+A key naming no rule warns on stderr, names the dictionary it read, and leaves
+the load and the exit code alone. The fields inside a rule's entry are fixed,
+so `min_repeat` under `[thresholds."composition.dead_metaphor"]` fails the
+load rather than warning.
 
 ### Every count and its floor
 
@@ -184,11 +184,9 @@ exclude = ["docs/notebook/", "meta/examples/**"]
 ```
 
 Patterns are globs matched against the path relative to the directory holding
-the dictionary. `*` stops at a `/` and `**` crosses one, so `docs/*.md` takes
-the Markdown directly under `docs` and `docs/**/*.md` takes it at any depth. A
-pattern ending in `/` is the directory and everything under it.
+the dictionary. `*` stops at a `/` and `**` crosses one. A pattern ending in
+`/` is the directory and everything under it.
 
 An excluded path is skipped before it is read, so naming one on the command
 line reports nothing and is not an error. A path outside the dictionary's
-directory is never excluded: the list belongs to one repository and says
-nothing about a file kept somewhere else.
+directory is never excluded.
