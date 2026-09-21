@@ -1,6 +1,6 @@
 ---
 title: Project dictionary
-description: Adjust the bundled patterns for one repository with a trps.toml, and keep paths out of a scan.
+description: Adjust the bundled patterns for one repository with a trps.toml, tune the counts a rule fires at, and keep paths out of a scan.
 sidebar:
   order: 3
 ---
@@ -105,27 +105,73 @@ Spelling inside a fenced block or front matter is never graded, and a single
 finding can be suppressed the way any other is. [Suppressing
 findings](/reference/suppressing-findings/) has the markers.
 
-## Tuning what repeats across files
+## Tuning what a rule counts
 
-`composition.cross_file_duplication` reports the wording a run's files share.
-[Usage](/reference/usage/) says what it reads; here is what a project sets. Six
-words in two files is the default, and a project that reuses more of its own
-wording than that raises either number:
+A rule that fires at a count reads it from `[thresholds]`, keyed by the rule id
+the finding prints. A project that finds one too strict raises it instead of
+silencing the rule, and a dictionary setting none of them scans the way the
+tool ships.
+
+A reference for a graphics library writes `primitive` in every section, and
+`composition.dead_metaphor` reports the word at five uses. Raising that one
+count leaves the rule on the other terms it reads:
 
 ```toml
-[cross_file]
-min_words = 10
-min_files = 3
+[thresholds."composition.dead_metaphor"]
+min_repeats = 12
 ```
 
-`min_words` counts the words of a shared run as the comparison reads them.
-`min_files` counts the files a run has to appear in, not the times it appears:
-a run used twice in one file and once in another is in two files. Two is the
-floor for both, and a smaller number is read as two.
+A rule id holds a dot, so the header can be quoted or written as a nested one:
+`[thresholds."composition.dead_metaphor"]` and
+`[thresholds.composition.dead_metaphor]` are different TOML and the same entry.
 
-Raise `min_words` when what gets reported is house phrasing you mean to keep.
-Raise `min_files` when a pair of documents is expected to overlap and a third
-would be the signal.
+### Every count and its floor
+
+| Rule                                          | Key                      | Default | Floor |
+| --------------------------------------------- | ------------------------ | ------- | ----- |
+| `composition.content_duplication`             | `min_length`             | 40      | 1     |
+| `composition.cross_file_duplication`          | `min_words`              | 6       | 2     |
+| `composition.cross_file_duplication`          | `min_files`              | 2       | 2     |
+| `composition.dead_metaphor`                   | `min_repeats`            | 5       | 2     |
+| `composition.fractal_summaries`               | `min_openings`           | 3       | 2     |
+| `composition.historical_analogy_stacking`     | `min_sentences`          | 3       | 2     |
+| `composition.one_point_dilution`              | `min_shared_terms`       | 3       | 2     |
+| `formatting.bold_first_leads`                 | `min_leads`              | 3       | 2     |
+| `formatting.em_dash_addiction`                | `floor`                  | 3       | 2     |
+| `formatting.em_dash_addiction`                | `count`                  | 6       | 2     |
+| `formatting.em_dash_addiction`                | `rate_per_hundred_words` | 2       | 1     |
+| `formatting.unicode_decoration`               | `min_occurrences`        | 3       | 2     |
+| `paragraph_structure.listicle_in_trench_coat` | `min_paragraphs`         | 3       | 2     |
+| `paragraph_structure.short_punchy_fragments`  | `min_sentences`          | 3       | 2     |
+| `paragraph_structure.short_punchy_fragments`  | `max_words`              | 4       | 1     |
+| `sentence_structure.anaphora_abuse`           | `min_sentences`          | 3       | 2     |
+| `sentence_structure.tricolon_abuse`           | `min_separators`         | 2       | 2     |
+| `sentence_structure.tricolon_abuse`           | `min_repeated_starts`    | 2       | 1     |
+
+Five of the keys count something the name does not say. `floor` is the number
+of dashes below which `formatting.em_dash_addiction` never reports, `count` is
+the number that reports however long the document is, and
+`rate_per_hundred_words` is the density that reports one too short to reach
+`count`.
+`min_length` is characters, measured over the words a passage normalizes to.
+`min_files` is the files a shared run appears in rather than the times it
+appears, so a run used twice in one file and once in another is in two files.
+
+A number below a key's floor is read as the floor. Most floors are two, because
+a rule counting a run of one reports every document: one bolded lead is a run
+of one, and one use of a term is a repeat of nothing. The four keys that floor
+at one do so because zero would either silence the rule or match everything.
+
+### A key naming no rule
+
+The keys are rule ids rather than fields, so rejecting an unfamiliar one would
+fail the dictionary over a typo. A key naming no rule is kept instead, and the
+CLI warns on stderr and names the file it read. The warning leaves the exit
+code alone.
+
+The fields inside a rule's entry are fixed, and a typo in one of those is
+rejected: `[thresholds."composition.dead_metaphor"]` carrying `min_repeat`
+fails the load rather than warning.
 
 ## Excluding paths
 
