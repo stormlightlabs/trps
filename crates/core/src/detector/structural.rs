@@ -85,13 +85,16 @@ impl Default for AnaphoraLimits {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct TricolonLimits {
-    /// Commas and semicolons a sentence holds before it reads as a list. Two
-    /// of them divide it into the three parts of a tricolon. At zero every
-    /// sentence is a list, so one is the floor.
+    /// Commas and semicolons a sentence holds before it reads as a list. A
+    /// tricolon is three parts, and two separators are what divide a
+    /// sentence into three, so two is the floor. Below it the rule reports
+    /// `Products help people, products help teams.`, a two-part sentence
+    /// that is no tricolon at all.
     pub min_separators: usize,
-    /// Clauses in a row opening with the same word. At zero the separators
+    /// Clauses in a row opening with the same word. One echo is the
+    /// parallelism the rule reads three parts by; at zero the separators
     /// alone report every sentence holding a pair of commas, so one is the
-    /// floor here as well.
+    /// floor.
     pub min_repeated_starts: usize,
 }
 
@@ -236,7 +239,7 @@ fn scan_anaphora(text: &str, sentences: &[super::Span], limits: AnaphoraLimits) 
 }
 
 fn scan_tricolon(text: &str, sentences: &[super::Span], limits: TricolonLimits) -> Vec<Finding> {
-    let min_separators = limits.min_separators.max(1);
+    let min_separators = limits.min_separators.max(2);
     let min_repeated_starts = limits.min_repeated_starts.max(1);
 
     sentences
@@ -582,12 +585,13 @@ mod tests {
 
     #[test]
     fn a_tuned_tricolon_count_moves_where_a_sentence_reports() {
-        let two_part = "Products impress people, products empower teams.";
+        let one_echo =
+            "Products impress people, products empower teams, and markets create worlds.";
         let three_part = "Products impress people, products empower teams, products create worlds.";
         let lowered = StructuralLimits {
             tricolon_abuse: TricolonLimits {
-                min_separators: 1,
                 min_repeated_starts: 1,
+                ..TricolonLimits::default()
             },
             ..StructuralLimits::default()
         };
@@ -606,8 +610,8 @@ mod tests {
             ..StructuralLimits::default()
         };
 
-        assert!(!fires(&scan_defaults(two_part), TRICOLON_ABUSE));
-        assert!(fires(&scan_structural(two_part, lowered), TRICOLON_ABUSE));
+        assert!(!fires(&scan_defaults(one_echo), TRICOLON_ABUSE));
+        assert!(fires(&scan_structural(one_echo, lowered), TRICOLON_ABUSE));
         assert!(fires(&scan_defaults(three_part), TRICOLON_ABUSE));
         assert!(!fires(
             &scan_structural(three_part, more_separators),
@@ -749,6 +753,51 @@ mod tests {
         assert!(!fires(
             &scan_structural(three, raised),
             HISTORICAL_ANALOGY_STACKING
+        ));
+    }
+
+    #[test]
+    fn a_separator_count_below_two_still_needs_three_parts_for_a_tricolon() {
+        let two_part = "Products help people, products help teams.";
+        let floor = StructuralLimits {
+            tricolon_abuse: TricolonLimits {
+                min_separators: 1,
+                min_repeated_starts: 1,
+            },
+            ..StructuralLimits::default()
+        };
+
+        assert!(!fires(&scan_structural(two_part, floor), TRICOLON_ABUSE));
+    }
+
+    #[test]
+    fn a_repeated_start_count_of_zero_is_clamped_rather_than_reporting_any_pair_of_commas() {
+        let listed = "Rain arrived at noon, wind followed by three, and the harbor went quiet.";
+        let floor = StructuralLimits {
+            tricolon_abuse: TricolonLimits {
+                min_repeated_starts: 0,
+                ..TricolonLimits::default()
+            },
+            ..StructuralLimits::default()
+        };
+
+        assert!(!fires(&scan_structural(listed, floor), TRICOLON_ABUSE));
+    }
+
+    #[test]
+    fn a_fragment_length_of_zero_is_clamped_rather_than_silencing_the_rule() {
+        let fragments = "Openly. Boldly. Truly.";
+        let floor = StructuralLimits {
+            short_punchy_fragments: FragmentLimits {
+                max_words: 0,
+                ..FragmentLimits::default()
+            },
+            ..StructuralLimits::default()
+        };
+
+        assert!(fires(
+            &scan_structural(fragments, floor),
+            SHORT_PUNCHY_FRAGMENTS
         ));
     }
 

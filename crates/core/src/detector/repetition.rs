@@ -423,6 +423,44 @@ mod tests {
     }
 
     #[test]
+    fn a_repeat_count_of_zero_is_clamped_rather_than_reporting_one_use_of_a_term() {
+        let once = "The ecosystem grew quietly around the harbor.";
+        let floor = RepetitionLimits {
+            dead_metaphor: DeadMetaphorLimits { min_repeats: 0 },
+            ..RepetitionLimits::default()
+        };
+
+        assert!(!fires(&scan_repetition(once, floor), DEAD_METAPHOR));
+    }
+
+    #[test]
+    fn a_shared_term_count_of_zero_is_clamped_rather_than_reporting_unrelated_paragraphs() {
+        let unrelated = "The wind rose over the harbor.\n\nA gull turned above the water.\n\nRain reached the pier by evening.";
+        let floor = RepetitionLimits {
+            one_point_dilution: DilutionLimits {
+                min_shared_terms: 0,
+            },
+            ..RepetitionLimits::default()
+        };
+
+        assert!(!fires(
+            &scan_repetition(unrelated, floor),
+            ONE_POINT_DILUTION
+        ));
+    }
+
+    #[test]
+    fn a_duplication_length_of_zero_is_clamped_rather_than_reporting_two_horizontal_rules() {
+        let ruled = "The harbor filled with fog.\n\n---\n\nThe gulls settled on the pilings.\n\n---\n\nEvening came.";
+        let floor = RepetitionLimits {
+            content_duplication: DuplicationLimits { min_length: 0 },
+            ..RepetitionLimits::default()
+        };
+
+        assert!(!fires(&scan_repetition(ruled, floor), CONTENT_DUPLICATION));
+    }
+
+    #[test]
     fn counts_set_to_zero_are_clamped_rather_than_reporting_plain_prose() {
         let limits = RepetitionLimits {
             dead_metaphor: DeadMetaphorLimits { min_repeats: 0 },
