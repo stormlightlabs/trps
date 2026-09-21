@@ -92,9 +92,8 @@ is a house convention or a tic is yours to decide:
 
 Case and punctuation do not count against a match, and a link counts as one
 word however long it is. The rule is quiet on short runs, so shared vocabulary
-stays out of the report. [Tuning what a rule
-counts](/reference/project-dictionary/) has the two counts it reads and when to
-raise them.
+stays out of the report. [Tuning rule counts](/reference/project-dictionary/)
+has the two counts it reads and when to raise them.
 
 ## A clean run
 

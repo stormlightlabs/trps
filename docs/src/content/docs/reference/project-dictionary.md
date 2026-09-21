@@ -105,15 +105,15 @@ Spelling inside a fenced block or front matter is never graded, and a single
 finding can be suppressed the way any other is. [Suppressing
 findings](/reference/suppressing-findings/) has the markers.
 
-## Tuning what a rule counts
+## Tuning rule counts
 
 A rule that fires at a count reads it from `[thresholds]`, keyed by the rule id
 the finding prints. A project that finds one too strict raises it instead of
 silencing the rule, and a dictionary setting none of them scans the way the
 tool ships.
 
-A reference for a graphics library writes `primitive` in every section, and
-`composition.dead_metaphor` reports the word at five uses. Raising that one
+A project that uses a graded term deliberately still reaches the rule's count:
+`composition.dead_metaphor` reports `primitive` at five uses. Raising that one
 count leaves the rule on the other terms it reads:
 
 ```toml
@@ -148,14 +148,18 @@ A rule id holds a dot, so the header can be quoted or written as a nested one:
 | `sentence_structure.tricolon_abuse`           | `min_separators`         | 2       | 2     |
 | `sentence_structure.tricolon_abuse`           | `min_repeated_starts`    | 2       | 1     |
 
-Five of the keys count something the name does not say. `floor` is the number
-of dashes below which `formatting.em_dash_addiction` never reports, `count` is
-the number that reports however long the document is, and
-`rate_per_hundred_words` is the density that reports one too short to reach
-`count`.
-`min_length` is characters, measured over the words a passage normalizes to.
-`min_files` is the files a shared run appears in rather than the times it
-appears, so a run used twice in one file and once in another is in two files.
+Five of the keys count something the name does not say. Three of them belong
+to `formatting.em_dash_addiction`. `floor` is the number of dashes below which
+the rule never reports, `count` is the number that reports however long the
+document is, and `rate_per_hundred_words` is the density that reports a
+document too short to reach `count`.
+
+In `composition.content_duplication`, `min_length` is characters, measured over
+the words a passage normalizes to.
+
+In `composition.cross_file_duplication`, `min_files` is the files a shared run
+appears in rather than the times it appears, so a run used twice in one file
+and once in another is in two files.
 
 A number below a key's floor is read as the floor. Most floors are two, because
 a rule counting a run of one reports every document: one bolded lead is a run
