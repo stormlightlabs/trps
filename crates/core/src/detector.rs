@@ -149,8 +149,14 @@ impl Detector {
             text,
             self.thresholds.bold_first_leads,
         ));
-        findings.extend(structural::scan_structural(text));
-        findings.extend(repetition::scan_repetition(text));
+        findings.extend(structural::scan_structural(
+            text,
+            self.thresholds.structural,
+        ));
+        findings.extend(repetition::scan_repetition(
+            text,
+            self.thresholds.repetition,
+        ));
 
         if let Some(rule) = &self.dialect {
             findings.extend(rule.scan(text));
@@ -902,6 +908,30 @@ min_occurrences = 2
 
         assert!(!decoration(Detector::bundled().unwrap()));
         assert!(decoration(
+            Detector::bundled().unwrap().with_thresholds(thresholds)
+        ));
+    }
+
+    #[test]
+    fn a_lowered_count_reaches_a_structural_or_repetition_rule_too() {
+        let thresholds = PatternFile::from_toml(
+            r#"
+[thresholds."composition.dead_metaphor"]
+min_repeats = 4
+"#,
+        )
+        .unwrap()
+        .thresholds;
+        let text = "The ecosystem needs ecosystem value. This ecosystem has ecosystem tools.";
+        let metaphor = |detector: Detector| {
+            detector
+                .scan(text)
+                .iter()
+                .any(|finding| finding.rule_id == repetition::DEAD_METAPHOR.0)
+        };
+
+        assert!(!metaphor(Detector::bundled().unwrap()));
+        assert!(metaphor(
             Detector::bundled().unwrap().with_thresholds(thresholds)
         ));
     }
