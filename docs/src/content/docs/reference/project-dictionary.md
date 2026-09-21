@@ -109,14 +109,12 @@ findings](/reference/suppressing-findings/) has the markers.
 
 A rule that fires at a count reads it from `[thresholds]`, keyed by the rule id
 the finding prints. A project that finds one too strict raises it instead of
-silencing the rule, and a dictionary setting none of them scans the way the
-tool ships.
+silencing the rule.
 
-A term a project uses in its technical sense still reaches the rule that reads
-it. `composition.dead_metaphor` counts the word and not the meaning, so it
-reports `primitive` at five uses. A parser's documentation means the smallest
-type a grammar names, and the rule cannot tell. Raising the count to twelve
-gives that documentation room:
+`composition.dead_metaphor` counts the word and not the meaning, so it reports
+`primitive` at five uses even in a parser's documentation, where the word means
+the smallest type a grammar has. Raising the count to twelve gives that
+documentation room:
 
 ```toml
 [thresholds."composition.dead_metaphor"]
@@ -127,12 +125,15 @@ A count belongs to its rule, not to the term or pattern that tripped it. The
 rule still counts each of its terms on its own, but holds every one of them to
 that same number, so the twelve above also stops reporting `wall` at seven
 uses and `door` at eight. Raise a count to the lowest number that quiets what
-you meant to quiet. Comparing a scan carrying the change against one without
-it shows what else went quiet.
+you meant to quiet.
 
-A rule id holds a dot, so the header can be quoted or written as a nested one:
-`[thresholds."composition.dead_metaphor"]` and
+A rule id holds a dot, so `[thresholds."composition.dead_metaphor"]` and
 `[thresholds.composition.dead_metaphor]` are different TOML and the same entry.
+
+A key naming no rule is kept rather than failing the load: the CLI warns on
+stderr, names the dictionary it read, and leaves the exit code alone. The
+fields inside a rule's entry are fixed, so `min_repeat` under
+`[thresholds."composition.dead_metaphor"]` fails the load rather than warning.
 
 ### Every count and its floor
 
@@ -157,9 +158,9 @@ A rule id holds a dot, so the header can be quoted or written as a nested one:
 | `sentence_structure.tricolon_abuse`           | `min_separators`         | 2       | 2     |
 | `sentence_structure.tricolon_abuse`           | `min_repeated_starts`    | 2       | 1     |
 
-Five of the keys count something the name does not say. Three of them belong
-to `formatting.em_dash_addiction`. `floor` is the number of dashes below which
-the rule never reports, `count` is the number that reports however long the
+Five of the keys count something the name does not say. In
+`formatting.em_dash_addiction`, `floor` is the number of dashes below which the
+rule never reports, `count` is the number that reports however long the
 document is, and `rate_per_hundred_words` is the density that reports a
 document too short to reach `count`.
 
@@ -170,21 +171,7 @@ In `composition.cross_file_duplication`, `min_files` is the files a shared run
 appears in rather than the times it appears, so a run used twice in one file
 and once in another is in two files.
 
-A number below a key's floor is read as the floor. Most floors are two, because
-a rule counting a run of one reports every document: one bolded lead is a run
-of one, and one use of a term is a repeat of nothing. The four keys that floor
-at one do so because zero would either silence the rule or match everything.
-
-### A key naming no rule
-
-The keys are rule ids rather than fields, so rejecting an unfamiliar one would
-fail the dictionary over a typo. A key naming no rule is kept instead, and the
-CLI warns on stderr and names the file it read. The warning leaves the exit
-code alone.
-
-The fields inside a rule's entry are fixed, and a typo in one of those is
-rejected: `[thresholds."composition.dead_metaphor"]` carrying `min_repeat`
-fails the load rather than warning.
+A number below a key's floor is read as the floor.
 
 ## Excluding paths
 

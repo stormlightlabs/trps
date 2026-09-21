@@ -103,12 +103,9 @@ A run that matches nothing says so on stderr:
 clean: nothing in the catalogue matched. Hedges, filler adverbs, and editorial asides are not in it.
 ```
 
-A run that printed nothing would read as a verdict on the prose. Tropius
-matches a catalogue of tropes, and most of the ways writing goes wrong are
-outside it, so read the text yourself.
-
-The line goes to stderr, so a `--json` pipeline reading stdout never sees it.
-Pass `-q` or `--quiet` to drop it.
+The catalogue is partial, so a clean run is not a verdict on the prose. The
+line goes to stderr, where a `--json` pipeline reading stdout never sees it,
+and `-q` or `--quiet` drops it.
 
 ## Exit codes
 
