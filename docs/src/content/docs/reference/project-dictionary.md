@@ -112,14 +112,23 @@ the finding prints. A project that finds one too strict raises it instead of
 silencing the rule, and a dictionary setting none of them scans the way the
 tool ships.
 
-A project that uses a graded term deliberately still reaches the rule's count:
-`composition.dead_metaphor` reports `primitive` at five uses. Raising that one
-count leaves the rule on the other terms it reads:
+A term a project uses in its technical sense still reaches the rule that reads
+it. `composition.dead_metaphor` counts the word and not the meaning, so it
+reports `primitive` at five uses. A parser's documentation means the smallest
+type a grammar names, and the rule cannot tell. Raising the count to twelve
+gives that documentation room:
 
 ```toml
 [thresholds."composition.dead_metaphor"]
 min_repeats = 12
 ```
+
+A count belongs to its rule, not to the term or pattern that tripped it. The
+rule still counts each of its terms on its own, but holds every one of them to
+that same number, so the twelve above also stops reporting `wall` at seven
+uses and `door` at eight. Raise a count to the lowest number that quiets what
+you meant to quiet. Comparing a scan carrying the change against one without
+it shows what else went quiet.
 
 A rule id holds a dot, so the header can be quoted or written as a nested one:
 `[thresholds."composition.dead_metaphor"]` and
