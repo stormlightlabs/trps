@@ -12,6 +12,13 @@ use crate::detector::char_class::{
 use crate::detector::cross_file::{CROSS_FILE_DUPLICATION, CrossFileLimits};
 use crate::detector::dialect::Dialect;
 use crate::detector::markdown::{BOLD_FIRST_LEADS, BoldLeadLimits};
+use crate::detector::repetition::{
+    CONTENT_DUPLICATION, DEAD_METAPHOR, ONE_POINT_DILUTION, RepetitionLimits,
+};
+use crate::detector::structural::{
+    ANAPHORA_ABUSE, FRACTAL_SUMMARIES, HISTORICAL_ANALOGY_STACKING, LISTICLE_IN_TRENCH_COAT,
+    SHORT_PUNCHY_FRAGMENTS, StructuralLimits, TRICOLON_ABUSE,
+};
 use crate::errors::{PatternLoadError, PatternValidationError};
 
 /// File names a project dictionary is discovered under, in search order.
@@ -193,6 +200,13 @@ pub struct Thresholds {
     /// What counts as decoration repeated often enough to report, under
     /// `formatting.unicode_decoration`. See [`DecorationLimits`].
     pub unicode_decoration: DecorationLimits,
+    /// The counts the repetition rules fire at, one field per rule id. They
+    /// are grouped because one scan reads them together. See
+    /// [`RepetitionLimits`].
+    pub repetition: RepetitionLimits,
+    /// The counts the structural rules fire at, one field per rule id. They
+    /// are grouped for the same reason. See [`StructuralLimits`].
+    pub structural: StructuralLimits,
     unknown: Vec<String>,
 }
 
@@ -221,6 +235,27 @@ impl Thresholds {
                 id if id == BOLD_FIRST_LEADS.0 => self.bold_first_leads = entry(value)?,
                 id if id == EM_DASH_ADDICTION.0 => self.em_dash_addiction = entry(value)?,
                 id if id == UNICODE_DECORATION_RULE_ID => self.unicode_decoration = entry(value)?,
+                id if id == CONTENT_DUPLICATION.0 => {
+                    self.repetition.content_duplication = entry(value)?
+                }
+                id if id == DEAD_METAPHOR.0 => self.repetition.dead_metaphor = entry(value)?,
+                id if id == ONE_POINT_DILUTION.0 => {
+                    self.repetition.one_point_dilution = entry(value)?
+                }
+                id if id == ANAPHORA_ABUSE.0 => self.structural.anaphora_abuse = entry(value)?,
+                id if id == FRACTAL_SUMMARIES.0 => {
+                    self.structural.fractal_summaries = entry(value)?
+                }
+                id if id == HISTORICAL_ANALOGY_STACKING.0 => {
+                    self.structural.historical_analogy_stacking = entry(value)?
+                }
+                id if id == LISTICLE_IN_TRENCH_COAT.0 => {
+                    self.structural.listicle_in_trench_coat = entry(value)?
+                }
+                id if id == SHORT_PUNCHY_FRAGMENTS.0 => {
+                    self.structural.short_punchy_fragments = entry(value)?
+                }
+                id if id == TRICOLON_ABUSE.0 => self.structural.tricolon_abuse = entry(value)?,
                 _ => match value {
                     toml::Value::Table(nested) if groups_rules(&nested) => {
                         self.read(&rule, nested)?
@@ -458,6 +493,11 @@ pub fn validate_patterns(patterns: &[Pattern]) -> Result<(), PatternValidationEr
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::detector::repetition::{DeadMetaphorLimits, DilutionLimits, DuplicationLimits};
+    use crate::detector::structural::{
+        AnalogyLimits, AnaphoraLimits, FragmentLimits, ListicleLimits, SummaryLimits,
+        TricolonLimits,
+    };
 
     #[test]
     fn deserializes_pattern_file() {
@@ -940,6 +980,97 @@ min_leads = 2
         assert_eq!(file.thresholds.em_dash_addiction.count, 10);
         assert_eq!(file.thresholds.unicode_decoration.min_occurrences, 5);
         assert_eq!(file.thresholds.bold_first_leads.min_leads, 2);
+        assert_eq!(file.thresholds.unknown_rules().count(), 0);
+    }
+
+    #[test]
+    fn a_dictionary_tunes_the_structural_and_repetition_counts() {
+        let file = PatternFile::from_toml(
+            r#"
+[thresholds."sentence_structure.anaphora_abuse"]
+min_sentences = 4
+
+[thresholds."sentence_structure.tricolon_abuse"]
+min_separators = 3
+min_repeated_starts = 3
+
+[thresholds."paragraph_structure.short_punchy_fragments"]
+min_sentences = 2
+max_words = 6
+
+[thresholds."paragraph_structure.listicle_in_trench_coat"]
+min_paragraphs = 4
+
+[thresholds."composition.fractal_summaries"]
+min_openings = 2
+
+[thresholds."composition.historical_analogy_stacking"]
+min_sentences = 4
+
+[thresholds."composition.dead_metaphor"]
+min_repeats = 8
+
+[thresholds."composition.one_point_dilution"]
+min_shared_terms = 4
+
+[thresholds."composition.content_duplication"]
+min_length = 80
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            file.thresholds.structural,
+            StructuralLimits {
+                anaphora_abuse: AnaphoraLimits { min_sentences: 4 },
+                tricolon_abuse: TricolonLimits {
+                    min_separators: 3,
+                    min_repeated_starts: 3,
+                },
+                short_punchy_fragments: FragmentLimits {
+                    min_sentences: 2,
+                    max_words: 6,
+                },
+                listicle_in_trench_coat: ListicleLimits { min_paragraphs: 4 },
+                fractal_summaries: SummaryLimits { min_openings: 2 },
+                historical_analogy_stacking: AnalogyLimits { min_sentences: 4 },
+            }
+        );
+        assert_eq!(
+            file.thresholds.repetition,
+            RepetitionLimits {
+                dead_metaphor: DeadMetaphorLimits { min_repeats: 8 },
+                one_point_dilution: DilutionLimits {
+                    min_shared_terms: 4,
+                },
+                content_duplication: DuplicationLimits { min_length: 80 },
+            }
+        );
+        assert_eq!(file.thresholds.unknown_rules().count(), 0);
+    }
+
+    #[test]
+    fn the_structural_and_repetition_rules_read_an_unquoted_id_too() {
+        let file = PatternFile::from_toml(
+            r#"
+[thresholds.sentence_structure.anaphora_abuse]
+min_sentences = 4
+
+[thresholds.composition.dead_metaphor]
+min_repeats = 8
+
+[thresholds.composition.content_duplication]
+min_length = 80
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(file.thresholds.structural.anaphora_abuse.min_sentences, 4);
+        assert_eq!(file.thresholds.repetition.dead_metaphor.min_repeats, 8);
+        assert_eq!(
+            file.thresholds.repetition.content_duplication.min_length,
+            80
+        );
         assert_eq!(file.thresholds.unknown_rules().count(), 0);
     }
 
