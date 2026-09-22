@@ -1,0 +1,15 @@
+{
+  "board": {
+    "owner": "stormlightlabs",
+    "number": 13,
+    "statusField": "Status",
+    "status": {
+      "todo": "Todo",
+      "inProgress": "In Progress",
+      "done": "Done"
+    }
+  },
+  "prose": {
+    "paths": ["README.md", "docs/src/content/docs"]
+  }
+}
