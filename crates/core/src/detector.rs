@@ -1,8 +1,8 @@
 //! Text detectors for phrase-based and structural trope signals.
 
 pub(crate) mod char_class;
-pub mod cross_file;
-pub mod dialect;
+pub(crate) mod cross_file;
+pub(crate) mod dialect;
 pub(crate) mod markdown;
 pub(crate) mod repetition;
 pub(crate) mod structural;
@@ -83,8 +83,9 @@ impl Detector {
         })
     }
 
-    /// Turns on the dialect rule, which [`Detector::new`] leaves off. See
-    /// [`dialect`] for why it has no default.
+    /// Turns on the dialect rule, which [`Detector::new`] leaves off. It has
+    /// no default because neither spelling is wrong until a project has
+    /// chosen one, and a default would report half of a British corpus.
     pub fn with_dialect(mut self, dialect: Dialect) -> Result<Self, DetectorBuildError> {
         self.dialect = Some(DialectRule::new(dialect)?);
 

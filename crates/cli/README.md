@@ -43,7 +43,7 @@ or `tropius.toml` at or above the directory it was started in.
 
 The [documentation site][site] covers what is not here:
 
-- scanning files and directories
+- scanning files
 - writing a project dictionary
 - suppressing a finding with an ignore marker
 - the JSON report
