@@ -29,7 +29,10 @@ trps README.md docs/guide.md
 | `-q`, `--quiet` | Drops the line a clean run writes to stderr. |
 
 Without `--dictionary`, `trps` applies the nearest `trps.toml`, `tropes.toml`,
-or `tropius.toml` at or above the directory it was started in.
+or `tropius.toml` in the directory it was started in or an ancestor of it,
+stopping at the repository root so a dictionary outside the project never
+reaches a scan inside it. Outside a repository only the starting directory is
+read.
 
 ## Exit codes
 
@@ -41,7 +44,7 @@ or `tropius.toml` at or above the directory it was started in.
 
 ## The rest
 
-The [documentation site][site] covers what is not here:
+The [reference documentation][reference] covers what is not here:
 
 - scanning files
 - writing a project dictionary
@@ -49,4 +52,4 @@ The [documentation site][site] covers what is not here:
 - the JSON report
 - which published catalog each rule came from
 
-[site]: https://trps.stormlightlabs.org
+[reference]: https://github.com/stormlightlabs/trps/tree/main/docs/src/content/docs/reference

@@ -6,7 +6,7 @@
 
 use std::collections::BTreeSet;
 
-use trps_core::detector::Detector;
+use trps_core::Detector;
 use trps_core::patterns::{SOURCES, bundled_patterns};
 
 /// Prose each bundled pattern has to report.

@@ -1,7 +1,9 @@
 #![deny(missing_docs)]
+//! The pattern dictionary and detectors that find AI writing tropes in prose.
 #![doc = include_str!("../README.md")]
 
-pub mod detector;
+mod detector;
+
 pub mod errors;
 pub mod excludes;
 pub mod patterns;
@@ -13,6 +15,11 @@ pub use crate::detector::{
     BUILTIN_RULE_IDS, Detector, Finding, FindingKind, LineIndex, Location, Span, group_by_span,
 };
 pub use crate::excludes::Excludes;
-pub use crate::patterns::{Dialect, Pattern, Severity, Thresholds};
+pub use crate::patterns::{
+    AnalogyLimits, AnaphoraLimits, BoldLeadLimits, CrossFileLimits, DashLimits, DeadMetaphorLimits,
+    DecorationLimits, Dialect, DilutionLimits, DuplicationLimits, FragmentLimits, ListicleLimits,
+    Pattern, RepetitionLimits, Severity, StructuralLimits, SummaryLimits, Thresholds,
+    TricolonLimits,
+};
 pub use crate::rules::Rules;
 pub use crate::suppression::Suppressions;

@@ -219,7 +219,7 @@ impl Finding {
     /// The structural rules all report at [`Severity::Medium`], so this
     /// takes no severity where [`Finding::repetition`] and
     /// [`Finding::markdown`] do.
-    pub fn structural(rule: (&str, &str), text: &str, span: Span) -> Finding {
+    pub(crate) fn structural(rule: (&str, &str), text: &str, span: Span) -> Finding {
         Finding {
             rule_id: rule.0.to_owned(),
             rule_name: rule.1.to_owned(),
@@ -232,7 +232,12 @@ impl Finding {
     }
 
     /// Builds a repetition finding from a byte range in the scanned text.
-    pub fn repetition(rule: (&str, &str), severity: Severity, text: &str, span: Span) -> Finding {
+    pub(crate) fn repetition(
+        rule: (&str, &str),
+        severity: Severity,
+        text: &str,
+        span: Span,
+    ) -> Finding {
         Finding {
             rule_id: rule.0.to_owned(),
             rule_name: rule.1.to_owned(),
@@ -245,7 +250,12 @@ impl Finding {
     }
 
     /// Builds a markdown-aware finding from a byte range in the scanned text.
-    pub fn markdown(rule: (&str, &str), severity: Severity, text: &str, span: Span) -> Finding {
+    pub(crate) fn markdown(
+        rule: (&str, &str),
+        severity: Severity,
+        text: &str,
+        span: Span,
+    ) -> Finding {
         Finding {
             rule_id: rule.0.to_owned(),
             rule_name: rule.1.to_owned(),

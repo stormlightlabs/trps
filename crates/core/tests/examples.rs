@@ -18,7 +18,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use trps_core::detector::Detector;
+use trps_core::Detector;
 
 /// Rule ids each slop example is expected to produce.
 const SLOP_RULES: &[(&str, &[&str])] = &[
