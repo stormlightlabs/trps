@@ -1,6 +1,7 @@
 [package]
 name = "trps-cli"
 description = "A CLI to detect AI tropes in prose"
+readme = "README.md"
 categories = ["command-line-utilities", "text-processing"]
 version.workspace = true
 edition.workspace = true

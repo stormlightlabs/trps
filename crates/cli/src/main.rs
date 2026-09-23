@@ -11,15 +11,8 @@ use clap::Parser;
 use owo_colors::{OwoColorize, Stream};
 use serde::Serialize;
 use trps_core::{
-    detector::{
-        Detector, Finding, FindingKind, LineIndex, Location,
-        cross_file::{CrossFileFinding, scan_cross_file},
-        group_by_span,
-    },
-    excludes::Excludes,
-    patterns::Severity,
-    rules::Rules,
-    suppression::Suppressions,
+    CrossFileFinding, Detector, Excludes, Finding, FindingKind, LineIndex, Location, Rules,
+    Severity, Suppressions, group_by_span, scan_cross_file,
 };
 
 /// Name the JSON report gives to text read from stdin.

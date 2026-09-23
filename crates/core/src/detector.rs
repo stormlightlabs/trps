@@ -1,11 +1,11 @@
 //! Text detectors for phrase-based and structural trope signals.
 
-pub mod char_class;
+pub(crate) mod char_class;
 pub mod cross_file;
 pub mod dialect;
-pub mod markdown;
-pub mod repetition;
-pub mod structural;
+pub(crate) mod markdown;
+pub(crate) mod repetition;
+pub(crate) mod structural;
 
 use std::fmt::Display;
 
@@ -213,6 +213,11 @@ pub struct Finding {
 }
 
 impl Finding {
+    /// Builds a structural finding from a byte range in the scanned text.
+    ///
+    /// The structural rules all report at [`Severity::Medium`], so this
+    /// takes no severity where [`Finding::repetition`] and
+    /// [`Finding::markdown`] do.
     pub fn structural(rule: (&str, &str), text: &str, span: Span) -> Finding {
         Finding {
             rule_id: rule.0.to_owned(),
@@ -304,19 +309,29 @@ impl Display for FindingKind {
 }
 
 impl FindingKind {
+    /// The short name a report prints for the kind, as [`Display`] writes
+    /// it. Owned, for a consumer that needs a `String` rather than a
+    /// formatter.
     pub fn label(self) -> String {
         self.to_string()
     }
 }
 
+/// A byte range into the text that was scanned: the start offset and the
+/// end offset, the same half-open range a slice takes.
+///
+/// Offsets are bytes rather than characters, so they index the scanned
+/// `str` directly. [`LineIndex`] turns one into a line and column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span(pub usize, pub usize);
 
 impl Span {
+    /// The byte offset the matched text starts at.
     pub fn start(&self) -> usize {
         self.0
     }
 
+    /// The byte offset one past the matched text.
     pub fn end(&self) -> usize {
         self.1
     }
