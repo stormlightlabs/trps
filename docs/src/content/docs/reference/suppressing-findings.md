@@ -56,3 +56,17 @@ trps-ignore-start -- transcribed from the 2019 proposal, quoted verbatim
 A marker counts anywhere on a line, so every comment syntax carries one and a
 plain text file can write the bare word. A region left open runs to the end of
 the file.
+
+## Markers written about rather than used
+
+This page writes the markers in code and suppresses nothing, because a marker
+inside a fenced block or an inline span is read as prose about a marker. That
+holds for `.md`, `.markdown`, and `.mdx` files. A repository whose Markdown
+carries real markers in its inline spans turns the skip off with `[markdown]
+skip_markers_in_code = false`. A fence is never a marker whichever way that
+key is set; the [project
+dictionary](/reference/project-dictionary/#markers-in-markdown-code) has both.
+
+Plain text is read the other way. A backtick there says nothing about code, so
+`trps-ignore-start` in a `.txt` file opens a region wherever it sits, and so
+does one in text read from stdin.

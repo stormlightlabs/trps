@@ -8,10 +8,12 @@ pub(crate) mod repetition;
 pub(crate) mod structural;
 
 use std::fmt::Display;
+use std::path::Path;
 
 use aho_corasick::{AhoCorasick, MatchKind};
 
 use crate::detector::dialect::{Dialect, DialectRule};
+use crate::detector::markdown::MarkdownOptions;
 use crate::errors::DetectorBuildError;
 use crate::patterns::{Pattern, Severity, Thresholds};
 use crate::patterns::{bundled_patterns, validate_patterns};
@@ -39,6 +41,43 @@ pub const BUILTIN_RULE_IDS: &[&str] = &[
     structural::TRICOLON_ABUSE.0,
 ];
 
+/// Extensions a path carrying Markdown is named with.
+const MARKDOWN_EXTENSIONS: &[&str] = &["md", "markdown", "mdx"];
+
+/// What kind of text a scan is reading.
+///
+/// It decides one thing: whether the code in a document is code. A
+/// suppression marker written inside a fence or an inline span is an example
+/// of a marker in Markdown, and is a marker anywhere else.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Format {
+    /// Prose carrying no markup. Text read from stdin has no path to read a
+    /// format from and is this one.
+    #[default]
+    PlainText,
+    /// Markdown, named by the extension on its path.
+    Markdown,
+}
+
+impl Format {
+    /// The format `path` is named for, from its extension.
+    pub fn of(path: &Path) -> Self {
+        let markdown = path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| {
+                MARKDOWN_EXTENSIONS
+                    .iter()
+                    .any(|known| extension.eq_ignore_ascii_case(known))
+            });
+
+        match markdown {
+            true => Self::Markdown,
+            false => Self::PlainText,
+        }
+    }
+}
+
 /// Finds trope signals in prose.
 #[derive(Debug)]
 pub struct Detector {
@@ -47,6 +86,7 @@ pub struct Detector {
     phrase_matcher: AhoCorasick,
     dialect: Option<DialectRule>,
     thresholds: Thresholds,
+    markdown: MarkdownOptions,
 }
 
 impl Detector {
@@ -64,7 +104,7 @@ impl Detector {
 
         for (pattern_index, pattern) in patterns.iter().enumerate() {
             for phrase in &pattern.phrases {
-                phrases.push(phrase.as_str());
+                phrases.push(collapse_whitespace(phrase));
                 phrase_to_pattern.push(pattern_index);
             }
         }
@@ -80,6 +120,7 @@ impl Detector {
             phrase_matcher,
             dialect: None,
             thresholds: Thresholds::default(),
+            markdown: MarkdownOptions::default(),
         })
     }
 
@@ -96,6 +137,13 @@ impl Detector {
     /// the ones the tool ships with.
     pub fn with_thresholds(mut self, thresholds: Thresholds) -> Self {
         self.thresholds = thresholds;
+        self
+    }
+
+    /// Applies what a project decided about reading Markdown, which
+    /// [`Detector::new`] leaves at the defaults.
+    pub fn with_markdown(mut self, markdown: MarkdownOptions) -> Self {
+        self.markdown = markdown;
         self
     }
 
@@ -133,9 +181,18 @@ impl Detector {
     /// Findings come back ordered by span, so the ones covering the same text
     /// sit together and [`group_by_span`] can collect them.
     pub fn scan(&self, text: &str) -> Vec<Finding> {
+        self.scan_as(text, Format::default())
+    }
+
+    /// Scans text read as `format`.
+    ///
+    /// The format decides whether the code in the text is code, which is what
+    /// [`Detector::suppressions`] reads it for. Everything [`Detector::scan`]
+    /// documents holds here too.
+    pub fn scan_as(&self, text: &str, format: Format) -> Vec<Finding> {
+        let suppressions = self.suppressions(text, format);
         let masked = markdown::mask_non_prose(text);
         let text = masked.as_str();
-        let suppressions = Suppressions::new(text);
         let mut findings = self.scan_phrases(text);
 
         findings.extend(char_class::scan_em_dash_addiction(
@@ -169,25 +226,151 @@ impl Detector {
         findings
     }
 
+    /// Reads the suppression markers of `text`, as a scan of it would.
+    ///
+    /// A caller that reports on the markers rather than scanning, as a run
+    /// warning about one that names no rule does, takes them from here. Both
+    /// then read one document: a marker this skips suppresses nothing and is
+    /// warned about by nobody.
+    ///
+    /// A fenced block in Markdown is never a marker, whatever the project
+    /// decided about the inline spans. Nothing in a fence is graded, so a
+    /// marker there suppresses only the prose after it, which is the silent
+    /// whole-file suppression the skip exists to stop.
+    pub fn suppressions(&self, text: &str, format: Format) -> Suppressions {
+        match (format, self.markdown.skip_markers_in_code) {
+            (Format::Markdown, true) => Suppressions::in_markdown(text),
+            (Format::Markdown, false) => Suppressions::new(&markdown::mask_non_prose(text)),
+            (Format::PlainText, _) => Suppressions::new(text),
+        }
+    }
+
+    /// Finds the phrases, over a copy of the text with its wraps undone.
+    ///
+    /// A phrase is a run of words, and where the text wraps mid-phrase the
+    /// words are the same ones. The match runs over [`reflow`]'s copy and every
+    /// span comes back in the offsets of `text`, so a finding quotes the
+    /// wrapped text and reports the line and column it was written at.
     fn scan_phrases(&self, text: &str) -> Vec<Finding> {
+        let reflowed = reflow(text);
+
         self.phrase_matcher
-            .find_iter(text)
+            .find_iter(reflowed.text.as_str())
             .map(|mat| {
                 let phrase_index = mat.pattern().as_usize();
                 let pattern = &self.phrase_patterns[self.phrase_to_pattern[phrase_index]];
+                let span = reflowed.span(mat.start(), mat.end());
 
                 Finding {
                     rule_id: pattern.id.clone(),
                     rule_name: pattern.name.clone(),
                     severity: pattern.severity,
                     kind: FindingKind::Phrase,
-                    matched: text[mat.start()..mat.end()].to_owned(),
+                    matched: text[span.start()..span.end()].to_owned(),
                     expected: None,
-                    span: Span(mat.start(), mat.end()),
+                    span,
                 }
             })
             .collect()
     }
+}
+
+/// A copy of the scanned text with its line wraps undone, and the offsets
+/// that lead back to it.
+///
+/// The phrase matcher compares bytes, so a phrase written with a space finds
+/// nothing where the text broke the line instead. Matching the copy and
+/// reporting the original is what lets one paragraph wrapped at two widths
+/// report the same rules.
+struct Reflowed {
+    text: String,
+    /// The offset into the scanned text of each byte of `text`, and of the end
+    /// of the scanned text at the last entry, so the end of a match maps as
+    /// readily as its start.
+    offsets: Vec<usize>,
+}
+
+impl Reflowed {
+    /// The span of the scanned text that `start..end` of the copy covers.
+    fn span(&self, start: usize, end: usize) -> Span {
+        Span(self.offsets[start], self.offsets[end])
+    }
+}
+
+/// Copies `text` with every line wrap collapsed to the single space it stands
+/// in for.
+///
+/// A wrap is any run of whitespace holding at most one newline, so the break
+/// itself, the indent that follows it, and the two spaces somebody left after
+/// a full stop all read as one space. A block quote repeats its `>` on every
+/// line it runs over, so the marker goes with the break it follows and a
+/// quoted paragraph wraps like any other.
+///
+/// A run holding two newlines is a paragraph break and is copied as it was
+/// written: the halves either side of it belong to different sentences, and no
+/// phrase should reach across them.
+fn reflow(text: &str) -> Reflowed {
+    let mut reflowed = String::with_capacity(text.len());
+    let mut offsets = Vec::with_capacity(text.len() + 1);
+    let mut characters = text.char_indices().peekable();
+
+    while let Some((offset, character)) = characters.next() {
+        if !character.is_whitespace() {
+            offsets.extend(std::iter::repeat_n(offset, character.len_utf8()));
+            reflowed.push(character);
+            continue;
+        }
+
+        let mut end = offset + character.len_utf8();
+        let mut newlines = usize::from(character == '\n');
+
+        loop {
+            while let Some(&(at, next)) = characters.peek() {
+                if !next.is_whitespace() {
+                    break;
+                }
+
+                newlines += usize::from(next == '\n');
+                end = at + next.len_utf8();
+                characters.next();
+            }
+
+            match characters.peek() {
+                Some(&(at, '>')) if newlines > 0 => {
+                    end = at + 1;
+                    characters.next();
+                }
+                _ => break,
+            }
+        }
+
+        match newlines < 2 {
+            true => {
+                offsets.push(offset);
+                reflowed.push(' ');
+            }
+            false => {
+                for (at, character) in text[offset..end].char_indices() {
+                    offsets.extend(std::iter::repeat_n(offset + at, character.len_utf8()));
+                }
+
+                reflowed.push_str(&text[offset..end]);
+            }
+        }
+    }
+
+    offsets.push(text.len());
+
+    Reflowed {
+        text: reflowed,
+        offsets,
+    }
+}
+
+/// Collapses the whitespace inside a phrase, so a dictionary that wrapped one
+/// across two lines matches what [`reflow`] produces.
+fn collapse_whitespace(phrase: &str) -> String {
+    phrase.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// A detector finding with byte offsets into the scanned text.
@@ -615,6 +798,162 @@ mod tests {
 
         assert_eq!(findings[0].rule_id, "word_choice.delve");
         assert_eq!(findings[0].matched, "DELVE INTO");
+    }
+
+    /// Whether a scan of `text` read as `format` reports the phrase rule the
+    /// text carries.
+    fn reports_delve(detector: &Detector, text: &str, format: Format) -> bool {
+        detector
+            .scan_as(text, format)
+            .iter()
+            .any(|finding| finding.rule_id == "word_choice.delve")
+    }
+
+    #[test]
+    fn a_marker_inside_an_inline_span_is_prose_about_a_marker() {
+        let detector = Detector::bundled().unwrap();
+        let text = "Write it as `trps-ignore-next-line`\nLet's delve into this.";
+
+        assert!(reports_delve(&detector, text, Format::Markdown));
+        assert!(!reports_delve(&detector, text, Format::PlainText));
+    }
+
+    #[test]
+    fn a_marker_inside_a_fence_is_prose_about_a_marker() {
+        let detector = Detector::bundled().unwrap();
+        let text = "```text\ntrps-ignore-start\n```\n\nLet's delve into this.";
+
+        assert!(reports_delve(&detector, text, Format::Markdown));
+        assert!(!reports_delve(&detector, text, Format::PlainText));
+    }
+
+    #[test]
+    fn a_backtick_that_never_closes_leaves_the_markers_after_it_alone() {
+        let detector = Detector::bundled().unwrap();
+        let text = "A ` opens nothing.\n\ntrps-ignore-next-line\nLet's delve into this.";
+
+        assert!(!reports_delve(&detector, text, Format::Markdown));
+    }
+
+    #[test]
+    fn a_stray_backtick_does_not_reach_the_code_span_below_it() {
+        let detector = Detector::bundled().unwrap();
+        let text = "<!-- trps-ignore-start -->\nHe said `hello.\n\
+<!-- trps-ignore-end -->\nA line with `code` in it.\n\nLet's delve into this.";
+
+        assert!(reports_delve(&detector, text, Format::Markdown));
+    }
+
+    #[test]
+    fn a_project_can_turn_the_skip_off() {
+        let detector = Detector::bundled().unwrap().with_markdown(MarkdownOptions {
+            skip_markers_in_code: false,
+        });
+        let text = "Write it as `trps-ignore-next-line`\nLet's delve into this.";
+
+        assert!(!reports_delve(&detector, text, Format::Markdown));
+    }
+
+    #[test]
+    fn a_marker_in_a_fence_stays_out_of_markdown_with_the_skip_off() {
+        let detector = Detector::bundled().unwrap().with_markdown(MarkdownOptions {
+            skip_markers_in_code: false,
+        });
+        let text = "```text\ntrps-ignore-start\n```\n\nLet's delve into this.";
+
+        assert!(reports_delve(&detector, text, Format::Markdown));
+    }
+
+    #[test]
+    fn markdown_is_the_extension_on_the_path() {
+        assert_eq!(Format::of(Path::new("notes.md")), Format::Markdown);
+        assert_eq!(Format::of(Path::new("notes.MARKDOWN")), Format::Markdown);
+        assert_eq!(Format::of(Path::new("docs/page.mdx")), Format::Markdown);
+        assert_eq!(Format::of(Path::new("notes.txt")), Format::PlainText);
+        assert_eq!(Format::of(Path::new("README")), Format::PlainText);
+    }
+
+    #[test]
+    fn a_phrase_matches_across_a_line_wrap() {
+        let detector = Detector::bundled().unwrap();
+        let findings = detector.scan("We should delve\ninto the details.");
+
+        assert_eq!(findings[0].rule_id, "word_choice.delve");
+        assert_eq!(findings[0].matched, "delve\ninto");
+    }
+
+    #[test]
+    fn a_phrase_matches_across_a_wrap_and_the_indent_under_it() {
+        let detector = Detector::bundled().unwrap();
+        let findings = detector.scan("- We should delve\n  into the details.");
+
+        assert_eq!(findings[0].rule_id, "word_choice.delve");
+        assert_eq!(findings[0].matched, "delve\n  into");
+    }
+
+    #[test]
+    fn a_phrase_matches_across_a_crlf_pair() {
+        let detector = Detector::bundled().unwrap();
+        let findings = detector.scan("We should delve\r\ninto the details.");
+
+        assert_eq!(findings[0].rule_id, "word_choice.delve");
+        assert_eq!(findings[0].matched, "delve\r\ninto");
+    }
+
+    #[test]
+    fn a_phrase_matches_across_a_wrap_inside_a_block_quote() {
+        let detector = Detector::bundled().unwrap();
+        let findings = detector.scan("> We should delve\n> into the details.");
+
+        assert_eq!(findings[0].rule_id, "word_choice.delve");
+        assert_eq!(findings[0].matched, "delve\n> into");
+    }
+
+    #[test]
+    fn a_phrase_does_not_match_across_a_blank_line_in_a_block_quote() {
+        let detector = Detector::bundled().unwrap();
+        let findings = detector.scan("> We should delve\n>\n> into the details.");
+
+        assert!(
+            !findings
+                .iter()
+                .any(|finding| finding.rule_id == "word_choice.delve")
+        );
+    }
+
+    #[test]
+    fn a_phrase_does_not_match_across_a_paragraph_break() {
+        let detector = Detector::bundled().unwrap();
+        let findings = detector.scan("We should delve\n\ninto the details.");
+
+        assert!(
+            !findings
+                .iter()
+                .any(|finding| finding.rule_id == "word_choice.delve")
+        );
+    }
+
+    #[test]
+    fn one_paragraph_wrapped_two_ways_reports_the_same_rules() {
+        let detector = Detector::bundled().unwrap();
+        let narrow = "We should delve\ninto the details.";
+        let wide = "We should delve into the details.";
+
+        let rules = |text: &str| -> Vec<String> {
+            detector
+                .scan(text)
+                .into_iter()
+                .map(|finding| finding.rule_id)
+                .collect()
+        };
+
+        assert_eq!(rules(narrow), rules(wide));
+
+        let finding = &detector.scan(narrow)[0];
+        let (start, end) = LineIndex::new(narrow).locate_span(finding.span);
+
+        assert_eq!((start.line, start.column), (1, 11));
+        assert_eq!((end.line, end.column), (2, 4));
     }
 
     #[test]

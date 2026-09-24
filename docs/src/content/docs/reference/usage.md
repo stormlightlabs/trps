@@ -69,6 +69,13 @@ A sentence ends at a `.`, `!`, or `?` with whitespace or the end of the file
 after it. A terminator inside a token does not end one, so `src/lib.rs` and
 `v0.1.1` are read as single words.
 
+A phrase wraps with the prose around it. A break inside one matches the space
+it stood in for, along with the indent under it and the `>` a block quote
+repeats, so a paragraph reports the same rules at whatever width it was
+wrapped. A finding that crosses a break reports the line and column of its
+first character and of its last. A blank line ends a phrase, since the halves
+either side of one belong to different sentences.
+
 ## What several paths share
 
 A run over more than one path also compares the files against each other and
@@ -101,6 +108,13 @@ clean: nothing in the catalogue matched. Hedges, filler adverbs, and editorial a
 
 The catalogue is partial, so a clean run is not a verdict on the prose. `-q`
 or `--quiet` drops the line.
+
+## What a run resolved
+
+`--config` reports the dictionary a run would apply and everything it changes,
+without scanning anything and without reading stdin. [Reading what the
+dictionary did](/reference/project-dictionary/#reading-what-the-dictionary-did)
+has the report.
 
 ## Exit codes
 

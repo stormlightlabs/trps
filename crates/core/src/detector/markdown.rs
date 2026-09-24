@@ -34,6 +34,29 @@ impl Default for BoldLeadLimits {
     }
 }
 
+/// What a project decides about reading Markdown, under `[markdown]`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct MarkdownOptions {
+    /// Whether a suppression marker inside code is read as prose about a
+    /// marker rather than as one.
+    ///
+    /// A page documenting the markers writes them in code, and a marker in a
+    /// fence or an inline span opens a region the page never closes. On by
+    /// default, because a repository that writes about the feature is the
+    /// common case and a repository generating Markdown whose code carries
+    /// real markers is not.
+    pub skip_markers_in_code: bool,
+}
+
+impl Default for MarkdownOptions {
+    fn default() -> Self {
+        Self {
+            skip_markers_in_code: true,
+        }
+    }
+}
+
 /// Finds markdown-specific trope signals.
 ///
 /// A run of bolded leads is the signal, so a list and a sequence of
@@ -177,6 +200,82 @@ pub(crate) fn mask_non_prose(text: &str) -> String {
     }
 
     String::from_utf8(masked).expect("a space in place of a byte leaves the text valid UTF-8")
+}
+
+/// Blanks the code of `text`, leaving prose and offsets where they were.
+///
+/// The front matter and the fenced blocks go the way [`mask_non_prose`] takes
+/// them, and the inline spans go with them. Only a reader that has to tell
+/// code from prose by the byte needs this; a detector reads the masked text
+/// and never sees a fence at all.
+pub(crate) fn mask_code(text: &str) -> String {
+    let mut masked = mask_non_prose(text).into_bytes();
+
+    for span in inline_code_spans(&masked) {
+        for byte in &mut masked[span.start()..span.end()] {
+            if *byte != b'\n' {
+                *byte = b' ';
+            }
+        }
+    }
+
+    String::from_utf8(masked).expect("a space in place of a byte leaves the text valid UTF-8")
+}
+
+/// The byte ranges of the inline code spans of `text`.
+///
+/// A span opens on a run of backticks and closes on a run of the same length
+/// on the same line. A run that meets no match is a backtick somebody wrote,
+/// and the search resumes after it rather than swallowing what follows.
+///
+/// Markdown lets a code span cross a line, and this does not. A marker sits
+/// on a line of its own, so pairing across lines lets one stray backtick
+/// reach the next real code span and blank every marker between the two,
+/// which is the silent suppression the skip exists to stop.
+fn inline_code_spans(text: &[u8]) -> Vec<Span> {
+    let mut spans = Vec::new();
+    let mut at = 0;
+
+    while at < text.len() {
+        if text[at] != b'`' {
+            at += 1;
+            continue;
+        }
+
+        let opening = backtick_run(text, at);
+        let mut search = at + opening;
+        let mut closed = false;
+
+        while search < text.len() {
+            match text[search] {
+                b'`' => {
+                    let closing = backtick_run(text, search);
+
+                    if closing == opening {
+                        spans.push(Span(at, search + closing));
+                        at = search + closing;
+                        closed = true;
+                        break;
+                    }
+
+                    search += closing;
+                }
+                b'\n' => break,
+                _ => search += 1,
+            }
+        }
+
+        if !closed {
+            at += opening;
+        }
+    }
+
+    spans
+}
+
+/// The length of the run of backticks starting at `at`.
+fn backtick_run(text: &[u8], at: usize) -> usize {
+    text[at..].iter().take_while(|byte| **byte == b'`').count()
 }
 
 /// The byte ranges of the front matter and the fenced blocks of `text`.

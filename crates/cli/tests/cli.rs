@@ -842,6 +842,192 @@ fn a_dialect_finding_is_suppressed_like_any_other() {
     assert_eq!(stdout(&output), "");
 }
 
+/// A dictionary that registers a source, declares a pattern citing it, and
+/// allows one phrase that matches nothing.
+const HOUSE_DICTIONARY: &str = r#"
+allow = ["nothing answers to this"]
+exclude = ["notebook/**"]
+
+[sources]
+house-style = "https://wiki.example.com/style"
+
+[[patterns]]
+id = "house.jargon"
+name = "House jargon"
+severity = "medium"
+sources = ["house-style"]
+phrases = ["synergize"]
+"#;
+
+#[test]
+fn the_config_report_names_the_dictionary_and_what_it_did() {
+    let directory = case_dir("config-report");
+    write(&directory, "trps.toml", HOUSE_DICTIONARY);
+
+    let output = run(Some(&directory), &["--config"], "", &[("NO_COLOR", "1")]);
+    let report = stdout(&output);
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(report.contains("trps.toml"));
+    assert!(report.contains("house.jargon is new"));
+    assert!(report.contains("`nothing answers to this` matches no bundled phrase"));
+    assert!(report.contains("notebook/**"));
+    assert!(report.contains("house-style https://wiki.example.com/style"));
+}
+
+#[test]
+fn the_config_report_says_when_no_dictionary_was_found() {
+    let directory = case_dir("config-no-dictionary");
+
+    let output = run(Some(&directory), &["--config"], "", &[("NO_COLOR", "1")]);
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(stdout(&output).contains("dictionary: none found"));
+}
+
+#[test]
+fn the_config_report_reads_the_dictionary_an_argument_names() {
+    let directory = case_dir("config-named-dictionary");
+    write(&directory, "house/trps.toml", HOUSE_DICTIONARY);
+
+    let output = run(
+        Some(&directory),
+        &["--config", "--dictionary", "house/trps.toml"],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(stdout(&output).contains("house/trps.toml"));
+    assert!(stdout(&output).contains("house.jargon is new"));
+}
+
+#[test]
+fn the_config_report_has_a_json_form() {
+    let directory = case_dir("config-json");
+    write(&directory, "trps.toml", HOUSE_DICTIONARY);
+
+    let output = run(
+        Some(&directory),
+        &["--config", "--json"],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&output)).expect("the config report is JSON");
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(report["declared"][0]["id"], "house.jargon");
+    assert_eq!(report["declared"][0]["replaces_bundled"], false);
+    assert_eq!(
+        report["allowed"][0]["patterns"].as_array().unwrap().len(),
+        0
+    );
+    assert_eq!(
+        report["sources"]["house-style"],
+        "https://wiki.example.com/style"
+    );
+}
+
+#[test]
+fn a_declared_pattern_citing_an_unregistered_source_fails_the_run() {
+    let directory = case_dir("config-unknown-source");
+    write(
+        &directory,
+        "trps.toml",
+        r#"
+[[patterns]]
+id = "house.jargon"
+name = "House jargon"
+severity = "medium"
+sources = ["wiki"]
+phrases = ["synergize"]
+"#,
+    );
+
+    let output = run(Some(&directory), &["--config"], "", &[("NO_COLOR", "1")]);
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(stderr(&output).contains("cites unknown source `wiki`"));
+}
+
+#[test]
+fn a_marker_written_in_markdown_code_is_read_as_prose() {
+    let directory = case_dir("marker-in-code");
+    write(
+        &directory,
+        "page.md",
+        "Write it as `trps-ignore-next-line`\nLet's delve into this.\n",
+    );
+
+    let output = run(Some(&directory), &["page.md"], "", &[("NO_COLOR", "1")]);
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stdout(&output).contains("word_choice.delve"));
+    assert_eq!(stderr(&output), "");
+}
+
+#[test]
+fn the_same_bytes_in_plain_text_still_suppress() {
+    let directory = case_dir("marker-in-text");
+    write(
+        &directory,
+        "page.txt",
+        "Write it as `trps-ignore-next-line`\nLet's delve into this.\n",
+    );
+
+    let output = run(
+        Some(&directory),
+        &["--quiet", "page.txt"],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stdout(&output), "");
+}
+
+#[test]
+fn a_dictionary_can_turn_the_markdown_skip_off() {
+    let directory = case_dir("marker-skip-off");
+    write(
+        &directory,
+        "trps.toml",
+        "[markdown]\nskip_markers_in_code = false\n",
+    );
+    write(
+        &directory,
+        "page.md",
+        "Write it as `trps-ignore-next-line`\nLet's delve into this.\n",
+    );
+
+    let output = run(
+        Some(&directory),
+        &["--quiet", "page.md"],
+        "",
+        &[("NO_COLOR", "1")],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stdout(&output), "");
+}
+
+#[test]
+fn a_phrase_split_by_a_line_wrap_is_found() {
+    let directory = case_dir("wrapped-phrase");
+    write(
+        &directory,
+        "page.md",
+        "The team will delve\ninto the logs tomorrow.\n",
+    );
+
+    let output = run(Some(&directory), &["page.md"], "", &[("NO_COLOR", "1")]);
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stdout(&output).contains("word_choice.delve"));
+    assert!(stdout(&output).contains("page.md:1:15-2:4"));
+}
+
 fn example(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../meta/examples")

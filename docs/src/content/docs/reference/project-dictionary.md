@@ -21,10 +21,9 @@ severity = "high"
 phrases = ["bounded"]
 ```
 
-A project pattern may carry a `sources` key, the way a bundled one does, but
-nothing checks what it says: the citation is yours, and the registry of keys a
-bundled pattern may cite is ours. [Sources](/reference/sources/) lists that
-registry.
+A project pattern cites its sources the way a bundled one does, once the
+project has registered them. [Citing a source](#citing-a-source) has the
+shape.
 
 The CLI looks for that file in the working directory and its ancestors, taking
 the nearest one it finds and stopping at the repository root, so a dictionary
@@ -190,3 +189,83 @@ the dictionary. `*` stops at a `/` and `**` crosses one. A pattern ending in
 An excluded path is skipped before it is read, so naming one on the command
 line reports nothing and is not an error. A path outside the dictionary's
 directory is never excluded.
+
+## Citing a source
+
+A pattern says where its phrases came from in a `sources` list. The keys it
+may use are the seven [the tool registers](/reference/sources/) and whatever
+the project registers in a `[sources]` table:
+
+```toml
+[sources]
+house-style = "https://wiki.corp.example/style"
+
+[[patterns]]
+id = "house.synergize"
+name = "Synergize"
+severity = "medium"
+sources = ["house-style"]
+phrases = ["synergize"]
+```
+
+A key neither side registers fails the load, which is the error a bundled
+pattern gets for the same mistake. A pattern citing nothing still loads: where
+a project's phrases came from is the project's business, and what it says
+about them has to be true.
+
+## Markers in Markdown code
+
+A page documenting the [ignore markers](/reference/suppressing-findings/)
+writes them in code, and a marker in an inline span is an example rather than
+an instruction. Markdown is read that way by default. A repository generating
+Markdown whose spans carry real markers turns it off:
+
+```toml
+[markdown]
+skip_markers_in_code = false
+```
+
+A marker in a fenced block is never one either way, whatever this says.
+Nothing inside a fence is graded, so a marker there can only open a region
+over the prose after it, which is the silent suppression worth stopping. An
+inline span sits in prose that is graded, which is why the two differ.
+
+Markdown is decided by the extension: `.md`, `.markdown`, and `.mdx`. Plain
+text is read the other way, because a backtick in arbitrary prose says nothing
+about code.
+
+A span closes on the same line it opened on. Markdown lets one cross a line,
+and reading it that way would let a stray backtick pair with the next real
+span and swallow every marker between the two.
+
+## Reading what the dictionary did
+
+A dictionary that does nothing scans like one that works. A file above the
+repository root is never found, and an allowlist entry matching no phrase
+takes nothing out of anything. `--config` reports what a run resolved, having
+scanned nothing:
+
+```text
+$ trps --config
+dictionary: /home/you/project/trps.toml
+patterns: 43
+
+declared patterns:
+  word_choice.delve replaces the bundled pattern
+  house.synergize is new
+
+allowed phrases:
+  `framework` left word_choice.grandiose_nouns
+  `moreovr` matches no bundled phrase
+
+excluded paths:
+  docs/notebook/**
+
+registered sources:
+  house-style https://wiki.corp.example/style
+```
+
+A section with nothing under it is left out, and a run that found no
+dictionary says `dictionary: none found`. `--json` writes the same report as
+one document, so a build can diff it; [JSON
+output](/reference/json-output/#the-configuration-report) has the shape.
