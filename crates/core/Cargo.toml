@@ -1,6 +1,7 @@
 [package]
 name = "trps-core"
 description = "Pattern dictionary and detectors that find AI tropes in prose"
+readme = "README.md"
 categories = ["text-processing", "development-tools"]
 version.workspace = true
 edition.workspace = true

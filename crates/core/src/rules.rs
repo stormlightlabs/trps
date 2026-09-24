@@ -31,13 +31,14 @@ pub struct Rules {
 impl Rules {
     /// Resolves the one dictionary a run applies to every path.
     ///
-    /// `dictionary` names the file to apply. Where it is `None`, the nearest
-    /// project dictionary at or above `from` applies, under the search
-    /// [`find_project_dictionary`] describes; `from` is the directory the run
-    /// was started in, where the caller knows it. A caller that could not read
-    /// its working directory passes `None` and no search happens, rather than
-    /// one from a directory that is only a guess. Where neither finds a
-    /// dictionary, the bundled patterns stand alone.
+    /// `dictionary` names the file to apply. Where it is `None`, the search
+    /// [`find_project_dictionary`] describes runs from `from`: the nearest
+    /// dictionary in that directory or an ancestor up to the repository root
+    /// applies, and outside a repository only `from` itself is read. `from`
+    /// is the directory the run was started in, where the caller knows it. A
+    /// caller that could not read its working directory passes `None` and no
+    /// search happens, rather than one from a directory that is only a guess.
+    /// Where neither finds a dictionary, the bundled patterns stand alone.
     ///
     /// A dictionary's excludes are compiled against the directory holding it,
     /// not `from`, so its globs read the way a path in that repository does

@@ -1,10 +1,10 @@
 //! A repetition detector that reads a whole run rather than one file.
 //!
-//! [`super::repetition`] compares passages inside one text, so a paragraph
-//! pasted into three files with the nouns changed is clean in every one of
-//! them, and a closing phrase reused across a week of documents is clean in
-//! each. This rule compares the files of a run against each other and reports
-//! the longest word runs they share.
+//! The in-file repetition detector compares passages inside one text, so a
+//! paragraph pasted into three files with the nouns changed is clean in every
+//! one of them, and a closing phrase reused across a week of documents is
+//! clean in each. This rule compares the files of a run against each other and
+//! reports the longest word runs they share.
 //!
 //! What to do about a repetition is the reader's call. A house convention and
 //! a tic look the same from here, so a finding names every place the run

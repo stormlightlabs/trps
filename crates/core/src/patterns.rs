@@ -6,20 +6,30 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Deserializer, de};
 
-use crate::detector::char_class::{
-    DashLimits, DecorationLimits, EM_DASH_ADDICTION, UNICODE_DECORATION_RULE_ID,
-};
-use crate::detector::cross_file::{CROSS_FILE_DUPLICATION, CrossFileLimits};
-use crate::detector::dialect::Dialect;
-use crate::detector::markdown::{BOLD_FIRST_LEADS, BoldLeadLimits};
-use crate::detector::repetition::{
-    CONTENT_DUPLICATION, DEAD_METAPHOR, ONE_POINT_DILUTION, RepetitionLimits,
-};
+use crate::detector::char_class::{EM_DASH_ADDICTION, UNICODE_DECORATION_RULE_ID};
+use crate::detector::cross_file::CROSS_FILE_DUPLICATION;
+use crate::detector::markdown::BOLD_FIRST_LEADS;
+use crate::detector::repetition::{CONTENT_DUPLICATION, DEAD_METAPHOR, ONE_POINT_DILUTION};
 use crate::detector::structural::{
     ANAPHORA_ABUSE, FRACTAL_SUMMARIES, HISTORICAL_ANALOGY_STACKING, LISTICLE_IN_TRENCH_COAT,
-    SHORT_PUNCHY_FRAGMENTS, StructuralLimits, TRICOLON_ABUSE,
+    SHORT_PUNCHY_FRAGMENTS, TRICOLON_ABUSE,
 };
 use crate::errors::{PatternLoadError, PatternValidationError};
+
+// The counts `Thresholds` holds, down to the leaves, and the dialect
+// `PatternFile` names. The detectors that read them are private to the crate,
+// so this is where a consumer names them.
+pub use crate::detector::char_class::{DashLimits, DecorationLimits};
+pub use crate::detector::cross_file::CrossFileLimits;
+pub use crate::detector::dialect::Dialect;
+pub use crate::detector::markdown::BoldLeadLimits;
+pub use crate::detector::repetition::{
+    DeadMetaphorLimits, DilutionLimits, DuplicationLimits, RepetitionLimits,
+};
+pub use crate::detector::structural::{
+    AnalogyLimits, AnaphoraLimits, FragmentLimits, ListicleLimits, StructuralLimits, SummaryLimits,
+    TricolonLimits,
+};
 
 /// File names a project dictionary is discovered under, in search order.
 pub const PROJECT_DICTIONARY_FILES: &[&str] = &["trps.toml", "tropes.toml", "tropius.toml"];
@@ -146,7 +156,7 @@ pub struct PatternFile {
     ///
     /// Naming one turns on `word_choice.dialect_spelling`, which reports
     /// every spelling the other dialect uses. The rule is off while this is
-    /// unset; [`crate::detector::dialect`] says why it has no default.
+    /// unset, because neither dialect is the one a project must write in.
     #[serde(default)]
     pub dialect: Option<Dialect>,
     /// Globs naming paths no scan reads, relative to the directory holding
