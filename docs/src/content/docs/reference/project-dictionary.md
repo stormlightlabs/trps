@@ -216,18 +216,27 @@ about them has to be true.
 ## Markers in Markdown code
 
 A page documenting the [ignore markers](/reference/suppressing-findings/)
-writes them in code, and a marker in a fenced block or an inline span is an
-example rather than an instruction. Markdown is read that way by default. A
-repository generating Markdown whose code carries real markers turns it off:
+writes them in code, and a marker in an inline span is an example rather than
+an instruction. Markdown is read that way by default. A repository generating
+Markdown whose spans carry real markers turns it off:
 
 ```toml
 [markdown]
 skip_markers_in_code = false
 ```
 
+A marker in a fenced block is never one either way, whatever this says.
+Nothing inside a fence is graded, so a marker there can only open a region
+over the prose after it, which is the silent suppression worth stopping. An
+inline span sits in prose that is graded, which is why the two differ.
+
 Markdown is decided by the extension: `.md`, `.markdown`, and `.mdx`. Plain
-text is read the other way whatever this says, because a backtick in arbitrary
-prose says nothing about code.
+text is read the other way, because a backtick in arbitrary prose says nothing
+about code.
+
+A span closes on the same line it opened on. Markdown lets one cross a line,
+and reading it that way would let a stray backtick pair with the next real
+span and swallow every marker between the two.
 
 ## Reading what the dictionary did
 

@@ -836,6 +836,15 @@ mod tests {
     }
 
     #[test]
+    fn a_stray_backtick_does_not_reach_the_code_span_below_it() {
+        let detector = Detector::bundled().unwrap();
+        let text = "<!-- trps-ignore-start -->\nHe said `hello.\n\
+<!-- trps-ignore-end -->\nA line with `code` in it.\n\nLet's delve into this.";
+
+        assert!(reports_delve(&detector, text, Format::Markdown));
+    }
+
+    #[test]
     fn a_project_can_turn_the_skip_off() {
         let detector = Detector::bundled().unwrap().with_markdown(MarkdownOptions {
             skip_markers_in_code: false,

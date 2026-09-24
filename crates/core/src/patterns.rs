@@ -432,8 +432,19 @@ pub fn apply_dictionary(base: Vec<Pattern>, dictionary: &PatternFile) -> Vec<Pat
     patterns
 }
 
+/// The form two phrases are compared in: lowercase, with every run of
+/// whitespace collapsed to one space.
+///
+/// The phrase matcher reads a wrapped phrase as the words it holds, so an
+/// allowlist entry and a declared phrase have to be compared the same way. A
+/// dictionary that wrapped `it is possible that` over two lines allows the
+/// phrase it looks like it allows.
 fn normalize(phrase: &str) -> String {
-    phrase.trim().to_ascii_lowercase()
+    phrase
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
 }
 
 /// A pattern a project dictionary declared.
@@ -894,6 +905,18 @@ phrases = ["bounded"]
         let dictionary = PatternFile::from_toml(r#"allow = ["harness"]"#).unwrap();
 
         assert!(apply_dictionary(base, &dictionary).is_empty());
+    }
+
+    #[test]
+    fn an_allowed_phrase_wrapped_over_two_lines_still_matches() {
+        let dictionary = PatternFile::from_toml("allow = [\"\"\"delve\ninto\"\"\"]").unwrap();
+        let patterns = apply_dictionary(bundled_patterns().unwrap(), &dictionary);
+        let delve = patterns
+            .iter()
+            .find(|pattern| pattern.id == "word_choice.delve")
+            .unwrap();
+
+        assert!(!delve.phrases.iter().any(|phrase| phrase == "delve into"));
     }
 
     #[test]

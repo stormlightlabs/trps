@@ -224,11 +224,14 @@ pub(crate) fn mask_code(text: &str) -> String {
 
 /// The byte ranges of the inline code spans of `text`.
 ///
-/// A span opens on a run of backticks and closes on the next run of the same
-/// length, which is how Markdown reads one: a run that never meets its match
-/// is a backtick somebody wrote, and the search resumes after it rather than
-/// swallowing the rest of the document. A blank line ends the search, because
-/// a code span sits inside one paragraph.
+/// A span opens on a run of backticks and closes on a run of the same length
+/// on the same line. A run that meets no match is a backtick somebody wrote,
+/// and the search resumes after it rather than swallowing what follows.
+///
+/// Markdown lets a code span cross a line, and this does not. A marker sits
+/// on a line of its own, so pairing across lines lets one stray backtick
+/// reach the next real code span and blank every marker between the two,
+/// which is the silent suppression the skip exists to stop.
 fn inline_code_spans(text: &[u8]) -> Vec<Span> {
     let mut spans = Vec::new();
     let mut at = 0;
@@ -257,7 +260,7 @@ fn inline_code_spans(text: &[u8]) -> Vec<Span> {
 
                     search += closing;
                 }
-                b'\n' if blank_line_at(text, search) => break,
+                b'\n' => break,
                 _ => search += 1,
             }
         }
@@ -273,14 +276,6 @@ fn inline_code_spans(text: &[u8]) -> Vec<Span> {
 /// The length of the run of backticks starting at `at`.
 fn backtick_run(text: &[u8], at: usize) -> usize {
     text[at..].iter().take_while(|byte| **byte == b'`').count()
-}
-
-/// Whether the newline at `at` is followed by a line holding nothing.
-fn blank_line_at(text: &[u8], at: usize) -> bool {
-    text[at + 1..]
-        .iter()
-        .find(|byte| !matches!(byte, b' ' | b'\t' | b'\r'))
-        .is_none_or(|byte| *byte == b'\n')
 }
 
 /// The byte ranges of the front matter and the fenced blocks of `text`.

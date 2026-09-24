@@ -254,7 +254,11 @@ fn print_config(rules: &Rules) {
                 false => format!("left {}", allowed.patterns.join(", ")),
             };
 
-            format!("`{}` {left}", allowed.phrase)
+            // A dictionary may wrap a phrase over two lines, and the entry
+            // is one line of a list.
+            let phrase = allowed.phrase.split_whitespace().collect::<Vec<_>>();
+
+            format!("`{}` {left}", phrase.join(" "))
         }),
     );
 
