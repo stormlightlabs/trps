@@ -73,3 +73,30 @@ entry however many files it appears in, and `occurrences` names each place:
 `matched` is the run as the first file writes it; the others differ from it
 only in case and punctuation. The key is absent when a run found nothing to
 report, which is every run over a single path.
+
+## The configuration report
+
+`--config --json` writes what a run resolved instead of what it found:
+
+```json
+{
+  "version": 1,
+  "dictionary": "/home/you/project/trps.toml",
+  "patterns": 43,
+  "declared": [{ "id": "house.synergize", "replaces_bundled": false }],
+  "allowed": [{ "phrase": "moreovr", "patterns": [] }],
+  "exclude": ["docs/notebook/**"],
+  "sources": { "house-style": "https://wiki.corp.example/style" },
+  "unknown_thresholds": []
+}
+```
+
+`patterns` is the count the run would scan with, after the dictionary was
+applied. `replaces_bundled` says whether a declared id took the place of a
+bundled pattern. The `patterns` inside an `allowed` entry names what the
+phrase was taken out of, and is empty where it matched nothing.
+`unknown_thresholds` lists the `[thresholds]` keys naming no rule, which the
+CLI also warns about on stderr.
+
+`version` is the number the findings document carries and rises with it, so a
+consumer reading both documents reads one number.

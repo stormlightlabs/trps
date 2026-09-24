@@ -117,6 +117,20 @@ impl Suppressions {
         Self { regions }
     }
 
+    /// Reads the markers in `text`, where `text` is Markdown and a marker
+    /// inside code is prose about a marker.
+    ///
+    /// A page documenting the markers writes them in a fence or an inline
+    /// span, and under [`Suppressions::new`] every one of those opens a
+    /// region the page never closes. Reading the same page this way leaves
+    /// the prose around the examples graded.
+    ///
+    /// Markdown is the only format this applies to. A backtick in plain text
+    /// says nothing about code, so [`Suppressions::new`] reads every line.
+    pub fn in_markdown(text: &str) -> Self {
+        Self::new(&crate::detector::markdown::mask_code(text))
+    }
+
     /// The rule ids named by markers that no id in `known` answers to, each
     /// with the offset of the line its marker was written on.
     ///

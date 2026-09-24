@@ -1,6 +1,6 @@
 //! Pattern dictionary types and bundled TOML loading.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -22,7 +22,7 @@ use crate::errors::{PatternLoadError, PatternValidationError};
 pub use crate::detector::char_class::{DashLimits, DecorationLimits};
 pub use crate::detector::cross_file::CrossFileLimits;
 pub use crate::detector::dialect::Dialect;
-pub use crate::detector::markdown::BoldLeadLimits;
+pub use crate::detector::markdown::{BoldLeadLimits, MarkdownOptions};
 pub use crate::detector::repetition::{
     DeadMetaphorLimits, DilutionLimits, DuplicationLimits, RepetitionLimits,
 };
@@ -163,6 +163,17 @@ pub struct PatternFile {
     /// this file. See [`crate::excludes::Excludes`].
     #[serde(default)]
     pub exclude: Vec<String>,
+    /// What the project decides about reading Markdown. See
+    /// [`MarkdownOptions`].
+    #[serde(default)]
+    pub markdown: MarkdownOptions,
+    /// Catalogs this file's patterns may cite, by key and URL.
+    ///
+    /// A bundled pattern cites [`SOURCES`], which is compiled in. A project
+    /// keeping its own catalog registers it here, and its patterns cite the
+    /// key the same way. See [`validate_declared_sources`].
+    #[serde(default)]
+    pub sources: BTreeMap<String, String>,
     /// Pattern entries declared by the file.
     #[serde(default)]
     pub patterns: Vec<Pattern>,
@@ -423,6 +434,105 @@ pub fn apply_dictionary(base: Vec<Pattern>, dictionary: &PatternFile) -> Vec<Pat
 
 fn normalize(phrase: &str) -> String {
     phrase.trim().to_ascii_lowercase()
+}
+
+/// A pattern a project dictionary declared.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct DeclaredPattern {
+    /// The id the dictionary gave it.
+    pub id: String,
+    /// Whether it took the place of a bundled pattern with the same id.
+    pub replaces_bundled: bool,
+}
+
+/// A phrase a project dictionary allowed.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct AllowedPhrase {
+    /// The phrase as the dictionary wrote it.
+    pub phrase: String,
+    /// The bundled patterns it was taken out of.
+    ///
+    /// Empty where the phrase matched none, which is the common way a
+    /// dictionary entry does nothing.
+    pub patterns: Vec<String>,
+}
+
+/// Reports what `dictionary` does to `base`, without applying it.
+///
+/// [`apply_dictionary`] returns the patterns a run scans with, and a pattern
+/// it dropped or replaced leaves no trace in them. A reader asking whether the
+/// dictionary did anything needs the trace, so this walks the same two
+/// decisions, in the order they are applied, and names what each one touched.
+/// A phrase allowed out of a pattern the same dictionary replaced took
+/// nothing with it, and is reported as having matched nothing.
+pub fn describe_dictionary(
+    base: &[Pattern],
+    dictionary: &PatternFile,
+) -> (Vec<DeclaredPattern>, Vec<AllowedPhrase>) {
+    let declared = dictionary
+        .patterns
+        .iter()
+        .map(|pattern| DeclaredPattern {
+            id: pattern.id.clone(),
+            replaces_bundled: base.iter().any(|bundled| bundled.id == pattern.id),
+        })
+        .collect();
+
+    let replaced: HashSet<&str> = dictionary
+        .patterns
+        .iter()
+        .map(|pattern| pattern.id.as_str())
+        .collect();
+
+    let allowed = dictionary
+        .allow
+        .iter()
+        .map(|phrase| {
+            let wanted = normalize(phrase);
+
+            AllowedPhrase {
+                phrase: phrase.clone(),
+                patterns: base
+                    .iter()
+                    .filter(|pattern| !replaced.contains(pattern.id.as_str()))
+                    .filter(|pattern| {
+                        pattern
+                            .phrases
+                            .iter()
+                            .any(|candidate| normalize(candidate) == wanted)
+                    })
+                    .map(|pattern| pattern.id.clone())
+                    .collect(),
+            }
+        })
+        .collect();
+
+    (declared, allowed)
+}
+
+/// Validates the citations on the patterns a project dictionary declares.
+///
+/// A declared pattern cites whatever the dictionary registered under
+/// `[sources]`, or one of the bundled [`SOURCES`]. Citing neither is the same
+/// mistake a bundled pattern makes when it cites a key nothing resolves, and
+/// gets the same error, so a citation stays something a reader can follow.
+///
+/// A pattern citing nothing at all is left alone. Where a project's phrases
+/// came from is the project's business; where they say they came from has to
+/// be true.
+pub fn validate_declared_sources(dictionary: &PatternFile) -> Result<(), PatternValidationError> {
+    for pattern in &dictionary.patterns {
+        for key in &pattern.sources {
+            if source(key).is_none() && !dictionary.sources.contains_key(key) {
+                return Err(PatternValidationError::UnknownSource {
+                    id: pattern.id.clone(),
+                    key: key.clone(),
+                });
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Validates the citations on patterns bundled with the crate.
@@ -784,6 +894,77 @@ phrases = ["bounded"]
         let dictionary = PatternFile::from_toml(r#"allow = ["harness"]"#).unwrap();
 
         assert!(apply_dictionary(base, &dictionary).is_empty());
+    }
+
+    #[test]
+    fn a_dictionary_registers_a_source_its_patterns_can_cite() {
+        let dictionary = PatternFile::from_toml(
+            r#"
+[sources]
+house-style = "https://wiki.example.com/style"
+
+[[patterns]]
+id = "house.jargon"
+name = "House jargon"
+severity = "medium"
+sources = ["house-style", "tropes.fyi"]
+phrases = ["synergize"]
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            dictionary.sources.get("house-style").map(String::as_str),
+            Some("https://wiki.example.com/style")
+        );
+        assert!(validate_declared_sources(&dictionary).is_ok());
+    }
+
+    #[test]
+    fn a_declared_pattern_citing_an_unregistered_source_is_rejected() {
+        let dictionary = PatternFile::from_toml(
+            r#"
+[[patterns]]
+id = "house.jargon"
+name = "House jargon"
+severity = "medium"
+sources = ["wiki"]
+phrases = ["synergize"]
+"#,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            validate_declared_sources(&dictionary),
+            Err(PatternValidationError::UnknownSource { key, .. }) if key == "wiki"
+        ));
+    }
+
+    #[test]
+    fn the_description_names_what_each_dictionary_entry_touched() {
+        let base = bundled_patterns().unwrap();
+        let dictionary = PatternFile::from_toml(
+            r#"
+allow = ["delve into", "nothing answers to this"]
+
+[[patterns]]
+id = "house.jargon"
+name = "House jargon"
+severity = "medium"
+phrases = ["synergize"]
+"#,
+        )
+        .unwrap();
+        let (declared, allowed) = describe_dictionary(&base, &dictionary);
+
+        assert_eq!(declared.len(), 1);
+        assert_eq!(declared[0].id, "house.jargon");
+        assert!(!declared[0].replaces_bundled);
+
+        assert_eq!(allowed[0].phrase, "delve into");
+        assert_eq!(allowed[0].patterns, ["word_choice.delve"]);
+        assert_eq!(allowed[1].phrase, "nothing answers to this");
+        assert!(allowed[1].patterns.is_empty());
     }
 
     #[test]

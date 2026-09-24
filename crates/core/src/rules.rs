@@ -6,13 +6,16 @@
 //! started. [`Rules::resolve`] settles all of it in one call, so a consumer
 //! gets what the command line gets without assembling it again.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::detector::Detector;
-use crate::errors::RulesError;
+use crate::errors::{PatternLoadError, RulesError};
 use crate::excludes::Excludes;
 use crate::patterns::{
-    Thresholds, apply_dictionary, bundled_patterns, find_project_dictionary, load_pattern_file,
+    AllowedPhrase, DeclaredPattern, MarkdownOptions, Thresholds, apply_dictionary,
+    bundled_patterns, describe_dictionary, find_project_dictionary, load_pattern_file,
+    validate_declared_sources,
 };
 
 /// What a run's project dictionary decides.
@@ -26,6 +29,28 @@ pub struct Rules {
     pub excludes: Excludes,
     /// The dictionary that was applied, where one was.
     pub dictionary: Option<PathBuf>,
+    /// What the dictionary changed, for a report that scans nothing.
+    pub resolution: Resolution,
+}
+
+/// What applying a project dictionary changed.
+///
+/// A dictionary that does nothing scans exactly like one that works, so the
+/// only way to tell them apart is a record of what each decision touched.
+/// This is that record: a run reports it rather than asking a reader to infer
+/// it from findings that never appeared.
+#[derive(Debug, Default)]
+pub struct Resolution {
+    /// Patterns the run scans with, after the dictionary was applied.
+    pub patterns: usize,
+    /// Patterns the dictionary declared. See [`DeclaredPattern`].
+    pub declared: Vec<DeclaredPattern>,
+    /// Phrases the dictionary allowed. See [`AllowedPhrase`].
+    pub allowed: Vec<AllowedPhrase>,
+    /// The exclude globs, as the dictionary wrote them.
+    pub excludes: Vec<String>,
+    /// The catalogs the dictionary registered, by key and URL.
+    pub sources: BTreeMap<String, String>,
 }
 
 impl Rules {
@@ -47,7 +72,9 @@ impl Rules {
         let mut patterns = bundled_patterns()?;
         let mut excludes = Excludes::default();
         let mut thresholds = Thresholds::default();
+        let mut markdown = MarkdownOptions::default();
         let mut dialect = None;
+        let mut resolution = Resolution::default();
 
         let dictionary = dictionary
             .map(Path::to_path_buf)
@@ -57,13 +84,27 @@ impl Rules {
             let file = load_pattern_file(path)?;
             let root = path.parent().unwrap_or(Path::new("."));
 
+            validate_declared_sources(&file).map_err(PatternLoadError::from)?;
+
+            let (declared, allowed) = describe_dictionary(&patterns, &file);
+
+            resolution.declared = declared;
+            resolution.allowed = allowed;
+            resolution.excludes = file.exclude.clone();
+            resolution.sources = file.sources.clone();
+
             excludes = Excludes::new(root, &file.exclude)?;
             dialect = file.dialect;
             patterns = apply_dictionary(patterns, &file);
             thresholds = file.thresholds;
+            markdown = file.markdown;
         }
 
-        let mut detector = Detector::new(patterns)?.with_thresholds(thresholds);
+        resolution.patterns = patterns.len();
+
+        let mut detector = Detector::new(patterns)?
+            .with_thresholds(thresholds)
+            .with_markdown(markdown);
 
         if let Some(dialect) = dialect {
             detector = detector.with_dialect(dialect)?;
@@ -73,6 +114,7 @@ impl Rules {
             detector,
             excludes,
             dictionary,
+            resolution,
         })
     }
 }

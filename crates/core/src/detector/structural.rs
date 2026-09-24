@@ -405,20 +405,33 @@ fn repeated_clause_starts(sentence: &str) -> usize {
         .count()
 }
 
+/// Ordinal words a paragraph can open a list item with.
+///
+/// The list reaches `tenth` because the rule counts paragraphs and a project
+/// raising `min_paragraphs` needs an ordinal for each one it asks for. A run
+/// longer than ten paragraphs is a list somebody wrote as a list.
+const ORDINALS: &[&str] = &[
+    "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth",
+];
+
+/// Whether a paragraph opens with an ordinal, as `the third`, `third,` or
+/// `third `.
+///
+/// All three forms are read for every ordinal. A paragraph opening `Fourth, `
+/// numbers itself the same way `The fourth ` does, and a rule that knew only
+/// some of the forms would break a run at whichever paragraph used another.
 fn paragraph_starts_with_ordinal(paragraph: &str) -> bool {
-    starts_with_any_ci(
-        paragraph.trim_start(),
-        &[
-            "the first",
-            "first,",
-            "first ",
-            "the second",
-            "second,",
-            "second ",
-            "the third",
-            "third,",
-        ],
-    )
+    let opening = paragraph.trim_start().to_ascii_lowercase();
+    let (opening, after_article) = match opening.strip_prefix("the ") {
+        Some(rest) => (rest, true),
+        None => (opening.as_str(), false),
+    };
+
+    ORDINALS.iter().any(|ordinal| {
+        opening
+            .strip_prefix(ordinal)
+            .is_some_and(|rest| after_article || rest.starts_with([',', ' ']))
+    })
 }
 
 fn has_analogy_marker(sentence: &str) -> bool {
@@ -707,6 +720,20 @@ mod tests {
         assert!(fires(&scan_defaults(three), LISTICLE_IN_TRENCH_COAT));
         assert!(!fires(
             &scan_structural(three, raised),
+            LISTICLE_IN_TRENCH_COAT
+        ));
+    }
+
+    #[test]
+    fn a_raised_listicle_count_reaches_the_ordinals_past_third() {
+        let four = "The first wall is access.\n\nSecond, pricing is a wall.\n\nThe third wall is trust.\n\nFourth, support is a wall.";
+        let raised = StructuralLimits {
+            listicle_in_trench_coat: ListicleLimits { min_paragraphs: 4 },
+            ..StructuralLimits::default()
+        };
+
+        assert!(fires(
+            &scan_structural(four, raised),
             LISTICLE_IN_TRENCH_COAT
         ));
     }

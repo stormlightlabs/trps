@@ -12,14 +12,15 @@ pub mod suppression;
 
 pub use crate::detector::cross_file::{CrossFileFinding, Occurrence, scan_cross_file};
 pub use crate::detector::{
-    BUILTIN_RULE_IDS, Detector, Finding, FindingKind, LineIndex, Location, Span, group_by_span,
+    BUILTIN_RULE_IDS, Detector, Finding, FindingKind, Format, LineIndex, Location, Span,
+    group_by_span,
 };
 pub use crate::excludes::Excludes;
 pub use crate::patterns::{
-    AnalogyLimits, AnaphoraLimits, BoldLeadLimits, CrossFileLimits, DashLimits, DeadMetaphorLimits,
-    DecorationLimits, Dialect, DilutionLimits, DuplicationLimits, FragmentLimits, ListicleLimits,
-    Pattern, RepetitionLimits, Severity, StructuralLimits, SummaryLimits, Thresholds,
-    TricolonLimits,
+    AllowedPhrase, AnalogyLimits, AnaphoraLimits, BoldLeadLimits, CrossFileLimits, DashLimits,
+    DeadMetaphorLimits, DeclaredPattern, DecorationLimits, Dialect, DilutionLimits,
+    DuplicationLimits, FragmentLimits, ListicleLimits, MarkdownOptions, Pattern, RepetitionLimits,
+    Severity, StructuralLimits, SummaryLimits, Thresholds, TricolonLimits,
 };
-pub use crate::rules::Rules;
+pub use crate::rules::{Resolution, Rules};
 pub use crate::suppression::Suppressions;

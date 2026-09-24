@@ -1,5 +1,6 @@
 //! Command-line interface for scanning prose with bundled trope detectors.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::{
     io::{self, Read},
@@ -11,8 +12,8 @@ use clap::Parser;
 use owo_colors::{OwoColorize, Stream};
 use serde::Serialize;
 use trps_core::{
-    CrossFileFinding, Detector, Excludes, Finding, FindingKind, LineIndex, Location, Rules,
-    Severity, Suppressions, group_by_span, scan_cross_file,
+    AllowedPhrase, CrossFileFinding, DeclaredPattern, Detector, Excludes, Finding, FindingKind,
+    Format, LineIndex, Location, Rules, Severity, group_by_span, scan_cross_file,
 };
 
 /// Name the JSON report gives to text read from stdin.
@@ -20,6 +21,9 @@ const STDIN_NAME: &str = "-";
 
 /// Version of the JSON report shape, raised when a consumer would have to
 /// change to keep reading it.
+///
+/// Both documents this writes carry it, the findings and the configuration,
+/// so a consumer that diffs either one reads a single number.
 const REPORT_VERSION: u32 = 1;
 
 #[derive(Debug, Parser)]
@@ -31,6 +35,9 @@ struct Args {
     /// `tropes.toml`, or `tropius.toml` in the repository.
     #[arg(long, value_name = "PATH")]
     dictionary: Option<PathBuf>,
+    /// Report the resolved configuration and scan nothing.
+    #[arg(long, conflicts_with = "inputs")]
+    config: bool,
     /// Report findings as JSON on stdout instead of a decorated report.
     #[arg(long)]
     json: bool,
@@ -43,6 +50,9 @@ struct Args {
 struct Source {
     name: String,
     text: String,
+    /// What the path said the text is. Markdown keeps the markers written in
+    /// its code out of the scan; stdin has no path and is plain text.
+    format: Format,
 }
 
 /// One run's findings over every path it was given.
@@ -119,12 +129,19 @@ fn run(args: Args) -> Result<bool, String> {
     let from = std::env::current_dir().ok();
     let rules = Rules::resolve(args.dictionary.as_deref(), from.as_deref())
         .map_err(|error| error.to_string())?;
+
+    warn_unknown_thresholds(&rules);
+
+    if args.config {
+        return report_config(&rules, args.json).map(|()| false);
+    }
+
     let sources = read_sources(args.inputs, &rules.excludes)?;
 
     let scanned: Vec<(Source, Vec<Finding>)> = sources
         .into_iter()
         .map(|source| {
-            let findings = rules.detector.scan(&source.text);
+            let findings = rules.detector.scan_as(&source.text, source.format);
             (source, findings)
         })
         .collect();
@@ -135,7 +152,6 @@ fn run(args: Args) -> Result<bool, String> {
         .collect();
     let shared = scan_cross_file(&texts, rules.detector.thresholds().cross_file_duplication);
 
-    warn_unknown_thresholds(&rules);
     warn_unknown_rules(&scanned, &rules.detector);
 
     match args.json {
@@ -151,6 +167,121 @@ fn run(args: Args) -> Result<bool, String> {
     }
 
     Ok(has_findings)
+}
+
+/// The resolved configuration, as one document a consumer can diff.
+#[derive(Serialize)]
+struct ConfigReport<'a> {
+    version: u32,
+    dictionary: Option<String>,
+    patterns: usize,
+    declared: &'a [DeclaredPattern],
+    allowed: &'a [AllowedPhrase],
+    exclude: &'a [String],
+    sources: &'a BTreeMap<String, String>,
+    /// `[thresholds]` keys naming no rule, which tune nothing.
+    unknown_thresholds: Vec<&'a str>,
+}
+
+/// Reports what the dictionary decided, having scanned nothing.
+///
+/// A dictionary that does nothing scans like one that works, so this names
+/// each decision and what it touched: the file it came from, the patterns it
+/// left, and for every entry, whether anything answered to it.
+fn report_config(rules: &Rules, json: bool) -> Result<(), String> {
+    match json {
+        true => print_config_json(rules),
+        false => {
+            print_config(rules);
+            Ok(())
+        }
+    }
+}
+
+fn print_config_json(rules: &Rules) -> Result<(), String> {
+    let resolution = &rules.resolution;
+    let report = ConfigReport {
+        version: REPORT_VERSION,
+        dictionary: rules
+            .dictionary
+            .as_ref()
+            .map(|path| path.display().to_string()),
+        patterns: resolution.patterns,
+        declared: &resolution.declared,
+        allowed: &resolution.allowed,
+        exclude: &resolution.excludes,
+        sources: &resolution.sources,
+        unknown_thresholds: rules.detector.thresholds().unknown_rules().collect(),
+    };
+
+    let json = serde_json::to_string_pretty(&report)
+        .map_err(|error| format!("failed to write the JSON report: {error}"))?;
+
+    println!("{json}");
+
+    Ok(())
+}
+
+/// Prints the resolved configuration. A section with nothing under it is left
+/// out, so what is printed is what the dictionary actually did.
+fn print_config(rules: &Rules) {
+    let resolution = &rules.resolution;
+
+    match &rules.dictionary {
+        Some(path) => println!("dictionary: {}", path.display()),
+        None => println!("dictionary: none found"),
+    }
+
+    println!("patterns: {}", resolution.patterns);
+
+    print_section(
+        "declared patterns",
+        resolution.declared.iter().map(|declared| {
+            let took = match declared.replaces_bundled {
+                true => "replaces the bundled pattern",
+                false => "is new",
+            };
+
+            format!("{} {took}", declared.id)
+        }),
+    );
+
+    print_section(
+        "allowed phrases",
+        resolution.allowed.iter().map(|allowed| {
+            let left = match allowed.patterns.is_empty() {
+                true => "matches no bundled phrase".to_owned(),
+                false => format!("left {}", allowed.patterns.join(", ")),
+            };
+
+            format!("`{}` {left}", allowed.phrase)
+        }),
+    );
+
+    print_section("excluded paths", resolution.excludes.iter().cloned());
+    print_section(
+        "registered sources",
+        resolution
+            .sources
+            .iter()
+            .map(|(key, url)| format!("{key} {url}")),
+    );
+}
+
+/// Prints one section of the configuration report, or nothing where the
+/// section is empty.
+fn print_section(heading: &str, entries: impl Iterator<Item = String>) {
+    let entries: Vec<String> = entries.collect();
+
+    if entries.is_empty() {
+        return;
+    }
+
+    println!("\n{heading}:");
+
+    for entry in entries {
+        println!("  {entry}");
+    }
 }
 
 /// Says that a run matched nothing, and names prose it never read for.
@@ -178,6 +309,7 @@ fn read_sources(inputs: Vec<PathBuf>, excludes: &Excludes) -> Result<Vec<Source>
         return Ok(vec![Source {
             name: STDIN_NAME.to_owned(),
             text: read_stdin()?,
+            format: Format::PlainText,
         }]);
     }
 
@@ -189,6 +321,7 @@ fn read_sources(inputs: Vec<PathBuf>, excludes: &Excludes) -> Result<Vec<Source>
                 .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
 
             Ok(Source {
+                format: Format::of(&path),
                 name: path.display().to_string(),
                 text,
             })
@@ -298,7 +431,9 @@ fn warn_unknown_rules(scanned: &[(Source, Vec<Finding>)], detector: &Detector) {
     for (source, _) in scanned {
         let index = LineIndex::new(&source.text);
 
-        for (rule, offset) in Suppressions::new(&source.text).unknown_rules(detector.rule_ids()) {
+        let suppressions = detector.suppressions(&source.text, source.format);
+
+        for (rule, offset) in suppressions.unknown_rules(detector.rule_ids()) {
             eprintln!(
                 "{} {} no rule is named `{rule}`",
                 "warning:".if_supports_color(Stream::Stderr, |text| text.yellow()),
